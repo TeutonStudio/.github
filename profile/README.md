@@ -34,7 +34,7 @@ Copycat-Formen entwerfen, Gebäude aus Bauteilen planen und mit einer CC:Tweaked
 
 Verbindet Mekanism-Maschinen über konfigurierbare Batterien mit Flux-Netzwerken. Eine eingesetzte Batterie versorgt die Maschine mit Energie aus dem gewählten Netzwerk.
 
-Wiki: noch nicht vorhanden · [Download](https://github.com/TeutonStudio/FluxBatterie/releases) · [README](https://github.com/TeutonStudio/FluxBatterie#readme) · [Issues](https://github.com/TeutonStudio/FluxBatterie/issues) · Modrinth: noch nicht gelistet
+[Wiki](https://github.com/TeutonStudio/FluxBatterie/wiki) · [Download](https://github.com/TeutonStudio/FluxBatterie/releases) · [README](https://github.com/TeutonStudio/FluxBatterie#readme) · [Issues](https://github.com/TeutonStudio/FluxBatterie/issues) · Modrinth: noch nicht gelistet
 
 ---
 
