@@ -42,7 +42,7 @@ Verbindet Mekanism-Maschinen über konfigurierbare Batterien mit Flux-Netzwerken
 
 Erweitert Tool Belt um zusätzliche Werkzeugplätze mit konfigurierbarem Slotlimit. Weitere Upgrades entstehen am Sewing Table von Sewing Kit.
 
-Wiki: noch nicht vorhanden · [Download](https://github.com/TeutonStudio/ToolBeltUnlimited/releases) · [README](https://github.com/TeutonStudio/ToolBeltUnlimited#readme) · [Issues](https://github.com/TeutonStudio/ToolBeltUnlimited/issues) · [Modrinth](https://modrinth.com/mod/toolbelt-unlimited)
+[Wiki (Deutsch)](https://github.com/TeutonStudio/ToolBeltUnlimited/wiki) · [Wiki (English)](https://github.com/TeutonStudio/ToolBeltUnlimited/wiki/English) · [Download](https://github.com/TeutonStudio/ToolBeltUnlimited/releases) · [README](https://github.com/TeutonStudio/ToolBeltUnlimited#readme) · [Issues](https://github.com/TeutonStudio/ToolBeltUnlimited/issues) · [Modrinth](https://modrinth.com/mod/toolbelt-unlimited)
 
 ---
 
