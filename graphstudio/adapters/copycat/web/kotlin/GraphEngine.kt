@@ -193,6 +193,22 @@ private fun solidMesh(material: String, solid: Solid, positions: List<P>, compon
     "material" to material, "boxes" to boxes(solid), "positions" to positions.map { intArrayOf(it.x, it.y, it.z) }.toTypedArray(),
     "component" to component
 )
+private fun exactMesh(material:String,faces:List<ExactSurface>,positions:List<P>,component:String)=json(
+    "material" to material,"boxes" to emptyArray<IntArray>(),
+    "faces" to faces.map { face -> json(
+        "normal" to doubleArrayOf(face.plane.x.toDouble(),face.plane.y.toDouble(),face.plane.z.toDouble()),
+        "vertices" to face.vertices.map { p -> doubleArrayOf(p.x.toDouble(),p.y.toDouble(),p.z.toDouble()) }.toTypedArray()
+    ) }.toTypedArray(),
+    "positions" to positions.map { intArrayOf(it.x,it.y,it.z) }.toTypedArray(),"component" to component
+)
+private fun geometryMeshes(resolved:ResolvedGeometry,positions:List<P>,component:String,filter:String="",material:(String)->String):List<Json> =
+    if(resolved.exactSolid==null) resolved.owned.filterKeys { filter.isEmpty() || it==filter }.entries.groupBy { material(it.key) }.map { (id,regions) ->
+        solidMesh(id,regions.fold(Solid()) { solid,region -> solid.union(region.value) },positions,component)
+    }
+    else (if(filter.isEmpty()) resolved.visibleSurfaces() else resolved.exactOwned[filter]?.surfaces().orEmpty().map { OwnedExactSurface(it,filter) })
+        .groupBy { material(it.group) }.map { (id,faces) ->
+        exactMesh(id,faces.map { it.surface },positions,component)
+    }
 private fun fullBlock(key: MeshKey, positions: List<P>) = json(
     "material" to key.block, "boxes" to arrayOf(intArrayOf(0, 0, 0, 16, 16, 16)),
     "positions" to positions.map { intArrayOf(it.x, it.y, it.z) }.toTypedArray(), "component" to key.component
@@ -213,9 +229,9 @@ fun previewGraph(isBuilding: Boolean, document: dynamic, library: dynamic, selec
         }
         val parts = if(selected.isEmpty()) GraphCompiler.compile(graph,original.groups) else GraphCompiler.intermediate(graph,n.id,original.groups)
         val filter = if(n.kind==NodeKind.OUTPUT) n.previewGroup else ""
-        val owned = if(parts.isEmpty()) emptyMap() else Geometry.resolve(parts,original.groups).owned
-        val meshes = owned.filterKeys { filter.isEmpty() || it==filter }.map { (id,solid) -> solidMesh(id,solid,listOf(P()),"form") }
-        return json("count" to owned.values.sumOf { it.count() }, "raw" to if(parts.isEmpty()) 0 else Extrusion.cost(parts,original.groups),
+        val resolved = Geometry.resolve(parts,original.groups)
+        val meshes = geometryMeshes(resolved,listOf(P()),"form",filter) { it }
+        return json("count" to resolved.owned.values.sumOf { it.count() }, "raw" to if(parts.isEmpty()) 0 else Extrusion.cost(parts,original.groups),
             "meshes" to meshes.toTypedArray())
     }
     val b = building(document)
@@ -244,8 +260,7 @@ fun previewGraph(isBuilding: Boolean, document: dynamic, library: dynamic, selec
         .groupBy({ MeshKey(it.parts, it.groups, it.material, it.surfaces, it.block, it.component) }, { it.pos })
     val meshes = grouped.flatMap { (key, positions) ->
         if (key.block.isNotEmpty()) listOf(fullBlock(key, positions))
-        else Geometry.resolve(key.parts, key.groups).materialSolids(key.material, key.surfaces)
-            .map { (material, solid) -> solidMesh(material, solid, positions, key.component) }
+        else geometryMeshes(Geometry.resolve(key.parts,key.groups),positions,key.component) { id -> key.surfaces[id] ?: key.material }
     }
     return json("count" to plan.placements.size, "raw" to plan.raw, "materials" to plan.materials.mapValues { it.value.toString() }.asJson(),
         "warnings" to plan.warnings.toTypedArray(), "meshes" to meshes.toTypedArray())

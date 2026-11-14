@@ -75,3 +75,18 @@ Der interne Port hat einen getrennten Browserspeicher.
 Das bisherige Copycat-Deployment bleibt bis zur bestätigten Übernahme erreichbar.
 Die vorliegende Fassung richtet noch keine alte URL um und beansprucht keine
 CC-Visual-Browserfunktion oder Prüfung einer Release-JAR.
+
+## Exakte Formvorschau
+
+Die 3D-Vorschau zeichnet Dachformen und andere exakte Ausschnitte mit ihren
+tatsächlichen polygonalen Schnittflächen. Das gilt auch für Copycats innerhalb
+von Gebäuden. Die Rasterzellen- und Zinkzählung verwendet weiterhin das
+konservative Kollisionsraster; gleiche Rasterzahlen bedeuten deshalb bei
+exakten Formen keine identische sichtbare Geometrie. Insbesondere entfernt
+`A XOR B` denselben Überlappungsbereich wie `(A vereinigt B) minus (A geschnitten B)`,
+auch wenn der entfernte Bereich innerhalb einzelner Kollisionszellen liegt.
+
+`adapters/copycat/web/test/exact-preview.test.js` prüft dies mit gekreuzten
+Dachformen an den tatsächlich gerenderten Dreiecken: Volumen, freie Sicht durch
+den Ausschnitt, Materialgruppen, Gebäudewiederholungen, leere Ergebnisse und
+unveränderte Rasterformen.
