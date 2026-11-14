@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "copycat": {
+    "repository": "https://github.com/TeutonStudio/Copycat-Architecture.git",
+    "commit": "726214ce74a9ad7dc6e7ad251aee9d2bbb68ebb1",
+    "version": "0.6.4",
+    "importedWebPath": "graphstudio/adapters/copycat/web",
+    "license": "MIT"
+  },
+  "ccvisual": {
+    "repository": "https://github.com/TeutonStudio/CCVisual.git",
+    "browserAdapter": "planned",
+    "nativeTests": "available-in-local-checkout"
+  }
+}

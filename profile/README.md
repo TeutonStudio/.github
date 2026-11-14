@@ -4,6 +4,16 @@ Wir entwickeln Minecraft-Mods für Technik, Automatisierung und kreatives Bauen.
 
 [TeutonStudio auf Modrinth](https://modrinth.com/organization/teutonstudio)
 
+## Graphstudio
+
+Unser gemeinsamer Arbeitsplatz für Form-, Gebäude- und Programmgraphen.
+Der öffentliche Copycat-Editor und die interne Modtestung werden im
+[Organisationsrepo](https://github.com/TeutonStudio/.github/tree/main/graphstudio)
+zusammengeführt. Der
+[Umbauplan für CC Visual](https://github.com/TeutonStudio/.github/blob/main/docs/GRAPHSTUDIO.md)
+beschreibt die nächsten Schritte. Die neue Browseradresse wird nach der ersten
+erfolgreichen Bereitstellung hier ergänzt.
+
 ---
 
 ## CC-Aeroworks
