@@ -34,7 +34,7 @@ internal object GraphModels {
         return value
     }
     fun newShape(kind:NodeKind):GraphNode = decodeGraphNode(defaults(catalog.copycat,kind.name,catalog.copycat.nodes[kind.name].defaults))
-        .copy(inputs=List(inputs(kind).first) { "" })
+        .copy(inputs=List(if(kind==NodeKind.MIRROR) 2 else if(kind==NodeKind.POSITION) 3 else inputs(kind).first) { "" })
     fun newBuilding(kind:BuildingKind,explicit:Boolean):BuildingNode {
         val model=catalog.building.nodes[kind.name]
         return decodeBuildingNode(defaults(catalog.building,kind.name,if(explicit || model.alwaysExplicit==true) model.defaults else model.legacyDefaults))

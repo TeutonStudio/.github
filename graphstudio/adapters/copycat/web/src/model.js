@@ -71,6 +71,8 @@ export function protectedNode(node) {
 }
 
 export function applyWires(mode, document, entries, wires, removed = []) {
+  const same=(a,b)=>a.length===b.length && a.every(wire=>b.some(other=>wire.source===other.source && wire.target===other.target && wire.port===other.port))
+  if(!removed.length && same(wires,connections(entries))) return document
   const layout = entries.map(({ node }) => node).filter(node => !removed.includes(node.id))
   const graph = applyGraphDiagram(mode === 'building', document, layout, wires)
   return { ...document, graph: retainedGraph(document, graph) }

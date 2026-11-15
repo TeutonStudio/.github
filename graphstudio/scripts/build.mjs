@@ -17,7 +17,7 @@ assertPublicSource(source)
 const required=JSON.parse(readFileSync(join(root,'adapters/copycat/core-contract.json'),'utf8'))
 const pinnedCatalog=JSON.parse(run('git',['show',`${lock.copycat.commit}:src/main/resources/assets/copycat_architect/graph-models.json`],source,true))
 if(!pinnedCatalog.copycat.graphSchemas.includes(required.formSchema) || !pinnedCatalog.building.graphSchemas.includes(required.buildingSchema)) {
-  throw new Error('The pinned public core does not meet this adapter contract (form schema 4 / building schema 5). Publish and verify a compatible core commit before updating sources.lock.json.')
+  throw new Error(`The pinned public core does not meet this adapter contract (form schema ${required.formSchema} / building schema ${required.buildingSchema}). Publish and verify a compatible core commit before updating sources.lock.json.`)
 }
 
 const work = join(cache, 'copycat-build'), web = join(work, 'web')

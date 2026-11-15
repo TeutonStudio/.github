@@ -11,8 +11,10 @@ export function saveNodeGroup(mode, document, ids, name, materials = {}, library
     node.part?.group, ...(node.savedCopycat?.parts || []).map(part => part.group),
     node.materialGroup, node.previewGroup, ...(node.inputGroups || []),
   ])])
-  return { id: crypto.randomUUID(), name: name.trim() || 'Knotengruppe', mode, materials: structuredClone(materials), library: mode === 'building' ? structuredClone(library) : null,
-    nodes: structuredClone(document.graph.nodes.filter(node => selected.has(node.id))),
+  const sourceGroup=document.graph.nodeGroups?.find(group=>group.nodes.length===selected.size && group.nodes.every(id=>selected.has(id)))
+  const groupNodes=sourceGroup ? sourceGroup.nodes.map(id=>document.graph.nodes.find(node=>node.id===id)) : document.graph.nodes.filter(node=>selected.has(node.id))
+  return { graphInterface:sourceGroup?.graphInterface?structuredClone(sourceGroup.graphInterface):undefined,id: crypto.randomUUID(), name: name.trim() || 'Knotengruppe', mode, palette:mode==='building'?structuredClone(document.palette):undefined, materials: structuredClone(materials), library: mode === 'building' ? structuredClone(library) : null,
+    nodes: structuredClone(groupNodes),
     wires: connections(entries).filter(wire => selected.has(wire.source) && selected.has(wire.target)),
     groups: mode === 'form' ? structuredClone(formGroups(document).filter(group => used.has(group.id))) : [] }
 }
@@ -75,7 +77,7 @@ export function insertNodeGroup(document, template, idFactory = () => `node_${cr
   const result = replaceNodes(mode === 'form' ? { ...document, groups } : document, [...document.graph.nodes, ...nodes])
   const entries = inspect(mode, result)
   const wires = [...connections(inspect(mode, document)), ...template.wires.map(wire => ({ ...wire, source: ids.get(wire.source), target: ids.get(wire.target) }))]
-  return { document: applyWires(mode, result, entries, wires), materials: Object.fromEntries(Object.entries(template.materials || {}).filter(([id]) => groupIds.has(id)).map(([id, material]) => [groupIds.get(id), material])) }
+  return { nodeIds:[...ids.values()], document: applyWires(mode, result, entries, wires), materials: Object.fromEntries(Object.entries(template.materials || {}).filter(([id]) => groupIds.has(id)).map(([id, material]) => [groupIds.get(id), material])) }
 }
 
 export function mergeLibraries(current, incoming) {
@@ -107,6 +109,7 @@ export function validateNodeGroup(template) {
   const base=template.mode === 'form' ? {schema:3,name:'Validation',graph:{schema:2,nodes:[{id:'result',kind:'OUTPUT',inputs:['']}]}} : {schema:2,name:'Validation',graph:{schema:1,nodes:[{id:'empty_wall',kind:'SEGMENT',block:'minecraft:air',length:1},{id:'result',kind:'BUILDING'}]}}
   let index=0
   const inserted=insertNodeGroup(base,template,()=>`validation_${index++}`)
+  if(template.graphInterface) inspect(template.mode,{...inserted.document,graph:{...inserted.document.graph,nodeGroups:[{id:"validation_group",name:template.name,nodes:inserted.nodeIds,graphInterface:template.graphInterface,inputConnections:{}}]}})
   validateReferences(inserted.document,template.library || {})
   return template
 }

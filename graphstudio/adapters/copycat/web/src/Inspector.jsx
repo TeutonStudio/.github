@@ -1,3 +1,5 @@
+import { IntegerField } from './IntegerField.jsx'
+import { MirrorPlanePicker } from './MirrorPlanePicker.jsx'
 import { useState } from 'react'
 import { TransformValues } from './TransformValues.jsx'
 import { ArrangementGrid } from './ArrangementGrid.jsx'
@@ -6,7 +8,23 @@ import { formGroups, model } from './model.js'
 import { MaterialField } from './Workspace.jsx'
 import { copycatShapeNames } from './copycat-options.js'
 
-export const names = {
+export const names = { REFERENCE:'Referenz',VECTOR_SPLIT:'Position zerlegen',
+  INT_ADD: 'Anzahl addieren',
+  INT_SUBTRACT: 'Anzahl subtrahieren',
+  INT_MULTIPLY: 'Anzahl multiplizieren',
+  INT_DIVIDE: 'Anzahl dividieren',
+  INT_MIN: 'Anzahl Minimum',
+  INT_MAX: 'Anzahl Maximum',
+  POSITION_ADD: 'Position addieren',
+  POSITION_SUBTRACT: 'Position subtrahieren',
+  POSITION_MULTIPLY: 'Position multiplizieren',
+  POSITION_DIVIDE: 'Position dividieren',
+  POSITION_MIN: 'Position Minimum',
+  POSITION_MAX: 'Position Maximum',
+  POSITION_X: 'Position zerlegen · X',
+  POSITION_Y: 'Position zerlegen · Y',
+  POSITION_Z: 'Position zerlegen · Z',
+
   POSITION:'Position (hB)', TRANSLATE:'Copycat positionieren', COPYCAT_POSITION:'Copycat positionieren', INT: 'Anzahl', ROTATION_SEGMENT: 'Rotationssegment', AREA: 'Fläche', SEGMENT_LAYOUT: 'Segmentanordnung', ROOM_GEOMETRY: 'Raumgrundriss', ROOF_LEVEL: 'Dachebene', ROOF_LAYOUT: 'Dachanordnung', STAIRWELL: 'Treppenhaus', ELEVATOR_SHAFT: 'Aufzugsschacht', SERVICE_SHAFT: 'Installationsschacht', GARDEN: 'Garten', PATH: 'Weg', ROOM_LAYOUT: 'Raumanordnung', BAY_WINDOW: 'Erker', DORMER: 'Gaube',
   INPUT: 'Grundform', UNION: 'Vereinigung', INTERSECTION: 'Schnitt', DIFFERENCE: 'Differenz',
   SYMMETRIC_DIFFERENCE: 'Symmetrische Differenz', ROTATE: 'Copycat rotieren', ROTATION: 'Rotation', OUTPUT: 'Ergebnis',
@@ -15,7 +33,7 @@ export const names = {
   COPYCAT_UNION: 'Copycat-Vereinigung', COPYCAT_INTERSECTION: 'Copycat-Schnitt', COPYCAT_DIFFERENCE: 'Copycat-Differenz', COPYCAT_SYMMETRIC_DIFFERENCE: 'Symmetrische Copycat-Differenz',
   SEGMENT_MIRROR: 'Segment spiegeln', SEGMENT_ROTATE: 'Segment rotieren',
   SEGMENT_UNION: 'Segment-Vereinigung', SEGMENT_INTERSECTION: 'Segment-Schnitt', SEGMENT_DIFFERENCE: 'Segment-Differenz', SEGMENT_SYMMETRIC_DIFFERENCE: 'Symmetrische Segment-Differenz',
-  COPYCAT: 'Copycat-Referenz', SEGMENT: 'Wandsegment', PATTERN: 'Wandmuster', FLOOR: 'Boden', CEILING: 'Decke',
+  COPYCAT: 'Referenz', SEGMENT: 'Wandsegment', PATTERN: 'Wandmuster', FLOOR: 'Boden', CEILING: 'Decke',
   ROOM: 'Raum', STOREY: 'Geschoss', ROOF: 'Dach', BUILDING: 'Gebäude'
 }
 
@@ -28,6 +46,8 @@ export function portName(port, node) {
     return port.id.slice(9).split(':').map(word => words[word] || word).join(' · ')
   }
   if (port.id.startsWith('edge:')) return `Wandkante ${port.id.slice(5)}`
+  if(node.kind==='POSITION' && /^\d$|^in:[0-2]$/.test(port.id)) return ['X','Y','Z'][Number(port.id.replace('in:',''))] + ' · Anzahl'
+  if(/^POSITION_[XYZ]$/.test(node.kind)) return 'Position · Vektor3'
   if (port.id === 'positionValue') return 'Position (hB)'
   if (['MIRROR','TRANSLATE'].includes(node.kind) && port.id === '1') return node.kind === 'MIRROR' ? 'Spiegelung' : 'Position (hB)'
   if (port.id === 'rotation') return 'Rotationen'
@@ -100,8 +120,8 @@ export function NodeFields({ mode, node, document, edit, library, onChooseCopyca
   const source = model.shapes.find(shape => shape.id === node.part?.source)
   const sourceName = node.kind === 'INPUT' ? copycatShapeNames[source?.name] || source?.name
     : node.kind === 'SAVED' ? node.savedCopycat?.name : library.forms?.[node.form]?.name || node.form
-  const copycatPicker = <button type="button" className="copycat-source-button" aria-label="Copycat auswählen" onClick={onChooseCopycat}>
-    <span>Copycat auswählen …</span><small>{sourceName || 'Grundform oder gespeicherte Form'}</small>
+  const copycatPicker = <button type="button" className="copycat-source-button" aria-label={mode==='building'?'Referenz auswählen':'Copycat auswählen'} onClick={onChooseCopycat}>
+    <span>{mode==='building'?'Referenz auswählen …':'Copycat auswählen …'}</span><small>{sourceName || 'Grundform oder gespeicherte Form'}</small>
   </button>
   if (mode === 'form') {
     const part = node.part
@@ -113,9 +133,9 @@ export function NodeFields({ mode, node, document, edit, library, onChooseCopyca
     return <>
       <NativeFields {...{ mode, node, edit, document, library, onInspectNode }} />
       {node.kind === 'SAVED' && copycatPicker}
-      {node.kind === 'MIRROR' && <Field label="Spiegelebene" value={node.mirror?.plane || 'X'} options={model.mirrorPlanes} onChange={plane => edit({ mirror: { plane } })} />}
+      {node.kind === 'MIRROR' && <MirrorPlanePicker value={node.mirror?.plane || 'X'} onChange={plane=>edit({mirror:{plane}})}/>}
       {node.kind === 'INPUT' && adapter && <>
-        <div className="copycat-source-row">{copycatPicker}{adapter.max > 1 && <label className="copycat-size">Größe<span className="compact-stepper"><input aria-label="Größe" type="number" min="1" max={adapter.max} step="1" value={part.size} onChange={event=>{const value=Number(event.target.value);if(Number.isInteger(value) && value>=1 && value<=adapter.max) edit({part:{...part,size:value}})}}/><span><button type="button" aria-label="Größe erhöhen" disabled={part.size>=adapter.max} onClick={()=>edit({part:{...part,size:part.size+1}})}>▴</button><button type="button" aria-label="Größe verringern" disabled={part.size<=1} onClick={()=>edit({part:{...part,size:part.size-1}})}>▾</button></span></span></label>}</div>
+        <div className="copycat-source-row">{copycatPicker}{adapter.max > 1 && <IntegerField className="copycat-size" label="Größe" value={part.size} min={1} max={adapter.max} onChange={size=>edit({part:{...part,size}})}/>}</div>
         {part.source === 'copycats:copycat_flat_pane' && partField('discCut', 'Scheibenanteil', undefined, 'number', 0, 2)}
         {partField('group', 'Materialgruppe', groups.map(group => [group.id, group.name]))}
       </>}
