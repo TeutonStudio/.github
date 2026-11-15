@@ -74,3 +74,16 @@ test('React Flow selection changes preserve multi-selection without being replac
  assert.equal(selectNodes(selected,[{type:'dimensions',id:'a',dimensions:{width:200,height:100}}]),selected)
  assert.deepEqual(selectNodes(selected,[{type:'select',id:'a',selected:false}]),['b'])
 })
+
+
+test('several pure value card references do not exhaust material roles',()=>{
+ let source=newCard();source=replaceNodes(source,[...source.graph.nodes,{...newNode(true,'INT','number',0,0,true),countValue:5}])
+ source=editNode('building',source,{...cardResult(source),resultType:'INT',inputs:['number']})
+ let target={document:newCard(),library,materials:{}}
+ const roles=Object.keys(target.document.palette)
+ for(let index=0;index<3;index++) target=insertSavedReference({mode:'building',...target,entry:{id:`entry${index}`,documentId:`definition${index}`,version:1,name:`Wert ${index}`,mode:'building',collection:'graphs',document:source,library}})
+ assert.deepEqual(Object.keys(target.document.palette),roles)
+ const groups=groupViews(target.document,inspect('building',target.document))
+ assert.equal(groups.length,3)
+ for(const group of groups) assert.equal(previewGraph(true,target.document,target.library,group.outputs[0].id).value,'Anzahl: 5')
+})

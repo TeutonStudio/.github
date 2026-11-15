@@ -490,7 +490,7 @@ function Studio({ mode, active }) {
             fitView fitViewOptions={{ padding: 0.15, maxZoom: 1.1 }} minZoom={0.13} maxZoom={2}
             selectNodesOnDrag={false} onNodeDragStart={(_,node)=>{setSelected(node.id);if(!selectedIds.includes(node.id))setSelectedIds([node.id])}} onNodeDrag={onDrag} onNodeDragStop={onDragStop} deleteKeyCode={null} nodesConnectable={!readOnly} edgesReconnectable={false}
             onNodeContextMenu={(event,node) => {event.preventDefault();if (!selectedIds.includes(node.id)) {setSelectedIds([node.id]);setSelected(node.id)}setContextMenu({x:Math.min(event.clientX,window.innerWidth-220),y:Math.min(event.clientY,window.innerHeight-90)})}}
-            onNodeClick={(event, node) => { setSelected(node.id); if(entries.find(entry=>entry.node.id===node.id)?.node.kind==='AREA') setPreviewMode('selected'); setSelectedWire(null); setSelectedIds(clickNodes(selectedIds,node.id,event.shiftKey || event.ctrlKey || event.metaKey)); }}
+            onNodeClick={(event, node) => { const ids=clickNodes(selectedIds,node.id,event.shiftKey || event.ctrlKey || event.metaKey);setSelected(ids.includes(node.id)?node.id:ids.at(-1) || null); if(entries.find(entry=>entry.node.id===node.id)?.node.kind==='AREA') setPreviewMode('selected'); setSelectedWire(null); setSelectedIds(ids); }}
             onEdgeClick={(_, edge) => { setSelectedWire(edge.id); setSelected(edge.target) }}
             onPaneClick={() => { setContextMenu(null);setSelected(null); setSelectedWire(null); setSelectedIds([]) }}
             isValidConnection={compatible} onConnect={connectView}

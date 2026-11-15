@@ -20,6 +20,8 @@ Versionslisten sind nach Sammlung und Identität gruppiert. Der Löschdialog zei
 jede Version mit ihrer Verwendung und sperrt referenzierte Versionen sowie die
 Gesamtlöschung bei bestehenden Referenzen. Änderungen prüfen den aktuellen
 Workspace synchron; die bestehende IndexedDB-Revisionsprüfung bleibt erhalten.
+Reine Anzahl-/Positionsreferenzen belegen keine unbenutzten Materialrollen;
+mehrere solcher Referenzen bleiben unabhängig auswertbar.
 Positionseingänge der Vektoroperationen heißen Position statt Copycat. Die im
 Client reproduzierte Rücksetzung der Mehrfachauswahl wurde behoben.
 
@@ -30,13 +32,13 @@ Client reproduzierte Rücksetzung der Mehrfachauswahl wurde behoben.
 - Vollständiger lokaler JVM-Lauf: 608 Tests, 606 bestanden, 0 Fehler. Zwei
   unveränderte optionale externe Vorlagensnapshot-Tests sind ohne ihre
   Umgebungsdateien nicht aktiviert. Keine Minecraft-Clientabnahme behauptet.
-- Öffentlicher Build aus veröffentlichten Quellen erfolgreich. 202 Browsertests,
+- Öffentlicher Build aus veröffentlichten Quellen erfolgreich. 203 Browsertests,
   alle bestanden, keine übersprungen. 23 Fälle JVM → Browser → JVM. Der
   verpflichtende JVM-Browser-Rücklauf wurde separat ohne Überspringen ausgeführt.
   Beim ersten JVM-Durchgang eines frischen Builds fehlen erwartungsgemäß noch
   Browserexporte; der zweite Durchgang prüft die erzeugten Exporte vollständig.
 - Root-Prüfungen für Quellen-Pin und Trennung interner/öffentlicher Ausgaben: 3/3.
-- Adapterfingerabdruck: `5cf0b39e81cebb1caba3e98bd0ac214d2e560a04a9ef1f3ac3a9ff6b447d6693`.
+- Adapterfingerabdruck: `81601643d4015d3fe7dc6b122cbbd730ff810a9208f15b570a28c5d106a6e319`.
 - Im echten Browser geprüft: Quadrat/Rechteck/Zeichnen, Maus- und Tastaturwahl,
   dynamischer Innenanschluss, Positionsbeschriftungen, Mehrfachauswahl,
   Gruppenspeicherung und Öffnung als eigene Karte (4 statt zuvor 8 Knoten),
@@ -44,6 +46,11 @@ Client reproduzierte Rücksetzung der Mehrfachauswahl wurde behoben.
 - CSS-Viewport 1195×725, 768×1024 und 390×844: Dokumentmaße entsprechen dem
   Viewport; kein vertikaler Seiten-Scroll. Raster- und Inspektorbereiche scrollen
   intern. Physischer Browserzoom 200 % wurde in diesem Lauf nicht verifiziert.
+
+Ältere lokale `NORMAL`-Rotationen mit einem Winkel ungleich null lassen sich
+noch nicht in eine gemeinsame Karte übernehmen. Der Editor weist dies ausdrücklich
+ab; die gespeicherte Originalversion bleibt unverändert und in der Vorschau lesbar.
+Solche Operationen müssen vor der Übernahme auf X/Y/Z umgestellt werden.
 
 Schema 7 kennzeichnet neue Flächen/Dynamik/Dachanschlüsse; Schema 8 typisierte
 Karten und Inline-Copycats. Bestehende Release-JARs und der lokale Modstand wurden

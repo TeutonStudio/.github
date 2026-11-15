@@ -53,7 +53,12 @@ export function moveViewNodes(document,groups,moved) {
 }
 function reference(entry) {return {documentId:identityOf(entry),version:entry.version || 1,name:entry.name,collection:entry.collection || 'graphs'}}
 function scopeLibrary(entry,namespace,currentLibrary) {
-  const source=entry.library || {},palette=entry.document?.palette || entry.palette || wireModels().Building.default.palette,roles=Object.fromEntries(Object.keys(palette).map(key=>[key,`${namespace}_${key}`]))
+  const scalarTypes=new Set(['INT','POSITION','ROTATION','MIRRORING'])
+  const result=entry.document?.graph?.nodes.find(node=>node.resultType)
+  const scalar=entry.collection==='nodeGroups'
+    ? entry.graphInterface?.outputs?.length ? entry.graphInterface.outputs.every(output=>scalarTypes.has(output.type)) : entry.nodes?.length && entry.nodes.every(node=>/^(INT|POSITION)(_|$)/.test(node.kind) || ['ROTATION','MIRRORING'].includes(node.kind))
+    : scalarTypes.has(result?.resultType)
+  const source=entry.library || {},palette=scalar?{}:entry.document?.palette || entry.palette || wireModels().Building.default.palette,roles=Object.fromEntries(Object.keys(palette).map(key=>[key,`${namespace}_${key}`]))
   const formIds=Object.fromEntries(Object.keys(source.forms || {}).map(key=>[key,`${namespace}_${key}`])),moduleIds=Object.fromEntries(Object.keys(source.modules || {}).map(key=>[key,`${namespace}_${key}`]))
   function scope(value,key) {
     if(Array.isArray(value)) return value.map(item=>scope(item))
