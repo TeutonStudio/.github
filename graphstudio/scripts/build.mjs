@@ -38,6 +38,9 @@ const adapter = join(root, 'adapters/copycat/web')
 for (const name of ['src', 'test', 'kotlin', 'public', 'tools']) rmSync(join(web, name), { recursive: true, force: true })
 cpSync(adapter, web, { recursive: true, filter: path => !['node_modules', 'dist', '.tools', 'generated'].includes(path.split('/').at(-1)) })
 run('npm', ['ci', '--no-audit', '--no-fund'], web)
+// Exchange outputs belong to one source revision. Regenerate them before the
+// first JVM pass so a reused build cache cannot validate stale browser exports.
+rmSync(join(work, 'build/graphstudio-exchange'), { recursive: true, force: true })
 run('./gradlew', ['test'], work)
 run('npm', ['test'], web)
 run('./gradlew', ['test', '--tests', '*GraphstudioExchangeTest.browserExports', '--rerun'], work)
