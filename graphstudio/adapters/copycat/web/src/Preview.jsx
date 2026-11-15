@@ -1,8 +1,9 @@
+import { MaterialDialog } from './MaterialDialog.jsx'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { useWorkspace } from './Workspace.jsx'
-import { axisColors, sides } from './orientation.js'
+import { axisColors, compassDirections, sides } from './orientation.js'
 import { exactGeometry } from './preview-geometry.js'
 
 const colors = {
@@ -109,13 +110,15 @@ function groundCompass(group, bounds) {
   canvas.width = canvas.height = 1024
   const context = canvas.getContext('2d')
   context.translate(512, 512)
-  context.strokeStyle = '#8fbbb4'; context.fillStyle = '#d9eee9'; context.lineWidth = 7
-  context.beginPath(); context.arc(0, 0, 440, 0, Math.PI * 2); context.stroke()
-  for (const [label, x, z] of [['Nord', 0, -1], ['Ost', 1, 0], ['Süd', 0, 1], ['West', -1, 0]]) {
-    context.beginPath(); context.moveTo(x * 255, z * 255); context.lineTo(x * 300, z * 300); context.stroke()
+  context.strokeStyle = '#8fbbb4'; context.lineWidth = 5
+  context.beginPath(); context.arc(0, 0, 380, 0, Math.PI * 2); context.stroke()
+  for (const {x,z,axis} of compassDirections) {
+    const perpendicular={x:-z,z:x}
+    context.strokeStyle=axisColors[axis];context.fillStyle=axisColors[axis];context.lineWidth=12
+    context.beginPath();context.moveTo(x*300,z*300);context.lineTo(x*426,z*426);context.stroke()
+    // The entire head starts beyond the ring, not at the arrow's inside anchor.
+    context.beginPath();context.moveTo(x*478,z*478);context.lineTo(x*414+perpendicular.x*27,z*414+perpendicular.z*27);context.lineTo(x*414-perpendicular.x*27,z*414-perpendicular.z*27);context.closePath();context.fill()
   }
-  context.fillStyle = '#eead7f'
-  context.beginPath(); context.moveTo(0, -325); context.lineTo(-18, -280); context.lineTo(18, -280); context.closePath(); context.fill()
   const texture = new THREE.CanvasTexture(canvas)
   texture.colorSpace = THREE.SRGBColorSpace
   const plane = new THREE.Mesh(new THREE.PlaneGeometry(diameter, diameter), new THREE.MeshBasicMaterial({ map: texture, transparent: true, side: THREE.DoubleSide, depthWrite: false, toneMapped: false }))
@@ -123,17 +126,17 @@ function groundCompass(group, bounds) {
   plane.position.set(center.x, bounds.min.y - Math.max(size.length() * 0.03, 0.08), center.z)
   group.add(plane)
   const labels = []
-  for (const [label, x, z] of [['Nord', 0, -1], ['Ost', 1, 0], ['Süd', 0, 1], ['West', -1, 0]]) {
+  for (const {label,x,z,axis} of compassDirections) {
     const text = document.createElement('canvas')
     text.width = 384; text.height = 160
     const ink = text.getContext('2d')
-    ink.fillStyle = '#d9eee9'; ink.font = 'bold 112px system-ui'
+    ink.fillStyle = axisColors[axis]; ink.font = 'bold 76px system-ui'
     ink.textAlign = 'center'; ink.textBaseline = 'middle'; ink.fillText(label, 192, 80)
     const map = new THREE.CanvasTexture(text)
     map.colorSpace = THREE.SRGBColorSpace
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(diameter * 384 / 1024, diameter * 160 / 1024), new THREE.MeshBasicMaterial({ map, transparent: true, side: THREE.DoubleSide, depthWrite: false, toneMapped: false }))
     mesh.rotation.x = -Math.PI / 2
-    mesh.position.set(center.x + x * diameter * 360 / 1024, plane.position.y + 0.002, center.z + z * diameter * 360 / 1024)
+    mesh.position.set(center.x + (x*320-z*75) * diameter / 1024, plane.position.y + 0.002, center.z + (z*320+x*75) * diameter / 1024)
     group.add(mesh); labels.push(mesh)
   }
   group.userData.labels = labels
@@ -383,8 +386,9 @@ export function Viewer({ plan, blockFrame, catalog, details }) {
   </div>
 }
 
-export default function Preview({ mode, document, library, selected, previewMode, onMode, collapsed, onToggle, materials }) {
+export default function Preview({ mode, document, library, selected, previewMode, onMode, collapsed, onToggle, materials, onDiagnostics }) {
   const { catalog } = useWorkspace()
+  const [showMaterials,setShowMaterials] = useState(false)
   const worker = useRef(null)
   const sequence = useRef(0)
   const running = useRef(false)
@@ -411,6 +415,7 @@ export default function Preview({ mode, document, library, selected, previewMode
     instance.onmessage = ({ data }) => {
       running.current = false
       if (data.id === sequence.current) {
+        onDiagnostics?.(data.diagnostics || [])
         setResult(previous => data.error ? { plan: previous.plan, error: data.error, pending: false } : data)
       }
       send()
@@ -431,11 +436,11 @@ export default function Preview({ mode, document, library, selected, previewMode
     }
     const timer = setTimeout(() => {
       setResult(previous => ({ ...previous, pending: true, error: '' }))
-      queued.current = { id, mode, document: latest.current, library, selected: target }
+      queued.current = { id, mode, document: latest.current, library, selected: target, materials }
       send()
     }, 130)
     return () => clearTimeout(timer)
-  }, [mode, content, library, target, missingSelection])
+  }, [mode, content, library, target, missingSelection, materials])
 
 
   const noun = mode === 'building' ? 'Platzierungen' : 'Rasterzellen'
@@ -461,10 +466,10 @@ export default function Preview({ mode, document, library, selected, previewMode
     {result.plan?.warnings?.map((warning, index) => <p className="preview-meta" key={index}>{warning}</p>)}
     <div className="axis-legend" aria-label="Koordinatenachsen"><span style={{color:axisColors.x}}>West (−X) · Ost (+X)</span><span style={{color:axisColors.y}}>Unten (−Y) · Oben (+Y)</span><span style={{color:axisColors.z}}>Nord (−Z) · Süd (+Z)</span>
       {blockFrame && <span>Rahmen: 16 hB · lange Marke: 8 hB · kurze Marken: 4 / 12 hB</span>}</div>
-    {result.plan?.materials && <details className="materials"><summary>Materialbedarf</summary>
-      {Object.entries(result.plan.materials).map(([id, count]) => <div key={id}><code>{id}</code><span>{count}</span></div>)}
-    </details>}
+    <p className="preview-meta">Ziel: <strong>{previewMode === 'selected' ? 'Selektiert' : 'Graph'}</strong></p>
+    <button type="button" disabled={!result.plan || result.pending || Boolean(result.error)} onClick={() => setShowMaterials(true)}>Materialbedarf …</button>
     </>} />
     </div>
+    {showMaterials && result.plan && !result.pending && !result.error && <MaterialDialog plan={result.plan} target={previewMode === 'selected' ? 'Selektiert' : 'Graph'} onClose={() => setShowMaterials(false)} />}
   </section>
 }

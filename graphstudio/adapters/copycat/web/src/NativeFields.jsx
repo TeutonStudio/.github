@@ -121,7 +121,7 @@ function Value({ type, value, change, title, path = '', settings = {} }) {
     const horizontalPoint = type === 'P' && (['buildingOffset', 'landscapeOffset'].includes(path) || /^accessInstances\.\d+\.position$/.test(path) || /^offsets\.\d+$/.test(path) && ['STOREY', 'BUILDING'].includes(context.node?.kind) || /^coordinates\.\d+$/.test(path) && ['AREA', 'ROOM_GEOMETRY', 'GARDEN'].includes(context.node?.kind))
     if (horizontalPoint) fields = fields.filter(([key]) => key !== 'y')
     if (type === 'RoofLevelConfig') fields = fields.filter(([key]) => !(['upperSlope', 'breakRatio'].includes(key) && object.form !== 'MANSARD') && !(key === 'height16' && object.mode !== 'HEIGHT') && !(key === 'knee16' && object.mode !== 'ANGLE'))
-    return <fieldset><legend>{title}</legend>{fields.filter(([key]) => !(context.group && key === 'id')).map(([key, field]) =>
+    return <fieldset className={type === 'P' ? 'coordinate-grid' : undefined} style={type === 'P' ? {'--coordinate-count':fields.length} : undefined}><legend>{title}</legend>{fields.filter(([key]) => !(context.group && key === 'id')).map(([key, field]) =>
       <Value key={key} type={field} path={path ? `${path}.${key}` : key} settings={contract.structures?.[type]?.[key]} value={object[key] ?? models[type].default?.[key]} title={label(key)} change={next => change({ ...object, [key]: next })} />)}</fieldset>
   }
   if (models.enums[type]) return pick(models.enums[type])
@@ -155,7 +155,7 @@ const formWidgets = {
 export function NativeFields({ mode, node, edit, document, library, onInspectNode }) {
   const [draft, setDraft] = useState(() => structuredClone(node))
   useEffect(() => setDraft(structuredClone(node)), [JSON.stringify(node)])
-  const fields = inspectorFields(mode, node).filter(field => !(mode === 'form' && formWidgets[node.kind]?.includes(field.path)))
+  const fields = inspectorFields(mode, node).filter(field => !(['INPUT','SAVED','COPYCAT'].includes(node.kind) && ['rotationAxis','quarterTurns','rotationPivot','translation','offset','turn','tilt','spin','top','part.top'].includes(field.path))).filter(field => !['rotationPivot','translation'].includes(field.path)).filter(field => !(mode === 'form' && formWidgets[node.kind]?.includes(field.path)))
   const context = useMemo(() => {
     if (mode !== 'building') return { mode, library, node: draft, slopes: model.roofSlopes }
     try {

@@ -1,6 +1,9 @@
 # Graphstudio
 
 Gemeinsamer Arbeitsplatz für Copycat- und CC-Visual-Graphen.
+
+Öffentlich: [Graphstudio](https://teutonstudio.github.io/.github/) ·
+[Copycat-Editor](https://teutonstudio.github.io/.github/copycat/?editor=form).
 Der [Plan mit Bestandsaufnahme und Abnahmekriterien](../docs/GRAPHSTUDIO.md)
 beschreibt die erste Fassung und den weiteren CC-Visual-Umbau.
 
@@ -36,28 +39,35 @@ und eine konkrete veröffentlichte Mod-JAR werden im Manifest unterschieden.
 
 ```sh
 cd graphstudio
-npm run internal -- --copycat "/pfad/Copycat Architect" --ccvisual /pfad/CCVisual
+npm run internal -- --copycat "/pfad/zum/oeffentlichen-0.6.4-Entwicklungsstand" --local "/pfad/zur/lokalen/Copycat Architect"
 npm run preview -- --internal
 ```
 
-Bei der üblichen lokalen Verzeichnisstruktur können beide Pfade entfallen.
-Vorschau: `http://127.0.0.1:4318/`. Nur Loopback, keine öffentliche Auslieferung.
-Der Runner führt die nativen Modtests offline erneut aus. Buildabhängigkeiten
-müssen bereits vorhanden sein. Im lokalen Copycat-Prototyp müssen außerdem die
-npm-Abhängigkeiten in `web/graph-editor` installiert sein. Er wird getrennt
-getestet und gebaut; das ist noch kein gemeinsamer Browser–Mod-Paritätsnachweis.
+Der Organisationsadapter in `adapters/copycat/web` bleibt der Haupteditor.
+Der Runner verwendet die native Arbeitskopie nur als Fachkern und legt den
+Browserbuild getrennt unter `.cache/copycat-development` an. Er überschreibt
+weder den Browserprototyp der lokalen Mod noch Webquellen im Mod-Checkout.
+Java 21 und die vorhandenen Gradle-Abhängigkeiten werden benötigt. Fehlende
+npm-Abhängigkeiten werden aus dem Lockfile installiert.
 
-CC Visual erhält zunächst einen Testbericht. Sein Editor läuft weiterhin im
-Minecraft-Client. Der optionale native UI-Test lautet im CC-Visual-Repo:
+Die Pflichtprüfungen umfassen native Transformationen und Parameter,
+JVM→Browser→JVM sowie mit `--local` den gemeinsamen Korpus durch beide
+Modstände. Fehlende oder übersprungene Pflichtfälle brechen den Lauf ab.
+Änderungen am Fachkern oder Adapter während der Prüfung brechen den Build ab.
+Vorschau: `http://127.0.0.1:4318/`. Sie bindet nur an Loopback.
 
-```sh
-./gradlew -I devtests/kilagraph-ui.gradle runClient --offline
-```
+Transformationen benötigen Formgraphschema 4 bzw. Gebäudegraphschema 5.
+`sources.lock.json` pinnt den veröffentlichten Fachkerncommit
+[`10a3693`](https://github.com/TeutonStudio/Copycat-Architecture/commit/10a369358e821abea048d432d42aa35b2dc4373c)
+auf Basis 0.6.4, Branch `codex/graphstudio-core-064`. Der neuere Mod-Hauptzweig
+und vorhandene Release-JARs werden dadurch nicht ersetzt. Der öffentliche Build
+prüft weiterhin saubere, gepinnte Quellen und den Mindestvertrag in
+`adapters/copycat/core-contract.json`.
 
-Ein fehlgeschlagener Testlauf erzeugt einen sichtbaren Fehlerstatus und endet
-mit Exitcode 1. Frühere Prüfergebnisse werden nicht als neue Erfolge übernommen.
-`.internal-dist` und `.cache` sind Git-ignoriert und nie Pages-Uploadquellen.
-Internes Remotehosting mit Zugriffskontrolle ist ein späterer Schritt.
+`.internal-dist` und `.cache` bleiben von Pages-Uploads ausgeschlossen.
+Nach ausdrücklicher Freigabe wird der öffentliche Build über den Pages-Workflow
+veröffentlicht. Der interne Entwicklungsstand bleibt davon getrennt. Issues werden
+nicht automatisch geschlossen. CC Visual ist nicht Teil dieses Copycat-Laufs.
 
 ## Herkunft, Daten und Umzug
 

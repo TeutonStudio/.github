@@ -1,6 +1,8 @@
+import { dependencies, deleteVersion, mergeVersions } from './documents.js'
+import { Modal } from './Modal.jsx'
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { createMaterials, FAITHFUL, importRepository, materialValue, parseMaterial, stateOptions, defaultProperties } from './materials.js'
-import { emptyWorkspace, resourceCache, saveWorkspace, stored, validateWorkspace } from './storage.js'
+import { migrateWorkspace, emptyWorkspace, resourceCache, saveWorkspace, stored, validateWorkspace } from './storage.js'
 import { readGraph } from './model.js'
 
 const Context = createContext(null)
@@ -18,7 +20,7 @@ export function Workspace({ children }) {
   const storedRevision = useRef(0)
   const lastSavedData = useRef(null)
   useEffect(() => { stored('workspace', 'current').then(value => {
-    const workspace = value ? validateWorkspace(value) : emptyWorkspace()
+    const workspace = value ? migrateWorkspace(validateWorkspace(value)) : emptyWorkspace()
     storedRevision.current = workspace._revision || 0
     for (const entry of Object.values(workspace.drafts)) readGraph(entry.document, entry.mode)
     lastSavedData.current = workspace
@@ -93,6 +95,7 @@ function LibraryPanel({ tab, setTab, onClose }) {
   const { data, update, catalog } = useWorkspace()
   const [url, setUrl] = useState(''), [ref, setRef] = useState(''), [root, setRoot] = useState('')
   const [busy, setBusy] = useState(false), [error, setError] = useState('')
+  const [deleteEntry,setDeleteEntry]=useState(null)
   const input = useRef(null)
   const importMod = async (source = null) => {
     setBusy(true); setError('')
@@ -108,9 +111,9 @@ function LibraryPanel({ tab, setTab, onClose }) {
       const restored = validateWorkspace(JSON.parse(await file.text()))
       for (const entry of [...restored.graphs, ...Object.values(restored.drafts)]) readGraph(entry.document, entry.mode)
       // Merge named entries; current unsaved drafts stay intact.
-      const recovered = Object.values(restored.drafts).map(entry => ({ ...entry, id: crypto.randomUUID(), name: `Wiederhergestellt · ${entry.document.name || entry.mode}` }))
-      update(data => ({ ...data, graphs: [...new Map([...data.graphs, ...restored.graphs, ...recovered].map(item => [item.id, item])).values()],
-        nodeGroups: [...new Map([...data.nodeGroups, ...restored.nodeGroups].map(item => [item.id, item])).values()],
+      const recovered = [...new Map(Object.values(restored.drafts).map(entry => [JSON.stringify(entry),entry])).values()].map(entry => ({ ...entry, id: crypto.randomUUID(), name: `Wiederhergestellt · ${entry.document.name || entry.mode}` }))
+      const graphs=mergeVersions(data.graphs,[...restored.graphs,...recovered]), nodeGroups=mergeVersions(data.nodeGroups,restored.nodeGroups)
+      update(data => ({ ...data, graphs, nodeGroups,
         mods: [...new Map([...data.mods, ...restored.mods].map(item => [item.repo, item])).values()] }))
       setError('Sicherung zusammengeführt. Benannte Graphen können im Editor geöffnet werden.')
     } catch (error) { setError(error.message) }
@@ -140,7 +143,7 @@ function LibraryPanel({ tab, setTab, onClose }) {
             <div className="button-row"><button disabled={busy} onClick={() => importMod(mod)}>Aktualisieren</button><button onClick={() => update(data => ({ ...data, mods: data.mods.filter(item => item.repo !== mod.repo) }))}>Verknüpfung entfernen</button></div>
           </article>)}<p className="hint">Eigene Java-Modell-Loader und erst beim Bauen erzeugte Dateien sind ohne veröffentlichte Ressourcen nicht darstellbar. Fehlende Abhängigkeiten als weiteres Repository verlinken.</p></>}
         {tab === 'saved' && <><p>{data.graphs.length} gespeicherte Graphen · {data.nodeGroups.length} Knotengruppen. Öffnen und Einfügen erfolgt über die Bibliothek-Leiste des jeweiligen Editors.</p>
-          {[...data.graphs.map(item => ({ ...item, type: 'Graph' })), ...data.nodeGroups.map(item => ({ ...item, type: 'Knotengruppe' }))].map(item => <article className="saved-entry" key={item.id}><strong>{item.name}</strong><small>{item.type} · {item.mode === 'form' ? 'Copycat' : 'Gebäude'}</small><button onClick={() => update(data => ({ ...data, [item.type === 'Graph' ? 'graphs' : 'nodeGroups']: data[item.type === 'Graph' ? 'graphs' : 'nodeGroups'].filter(entry => entry.id !== item.id) }))}>Entfernen</button></article>)}
+          {[...data.graphs.map(item => ({ ...item, type: 'Graph' })), ...data.nodeGroups.map(item => ({ ...item, type: 'Knotengruppe' }))].map(item => <article className={`saved-entry ${deleteEntry?.id === item.id ? 'delete-armed' : ''}`} key={item.id}><strong>{item.name}</strong><small>{item.type} · {item.mode === 'form' ? 'Copycat' : 'Gebäude'}</small><small>Browser · Version {item.version || 1}</small><button className="danger" disabled={deleteEntry?.id === item.id && dependencies(data,deleteEntry).length>0} onClick={()=>{const entry={...item,collection:item.type === 'Graph' ? 'graphs' : 'nodeGroups'};if(deleteEntry?.id !== item.id) {setDeleteEntry(entry);return} try {update(current=>deleteVersion(current,entry.collection,entry.id));setDeleteEntry(null)} catch(e) {setError(e.message)}}}>{deleteEntry?.id === item.id ? 'Jetzt löschen' : 'Löschen'}</button>{deleteEntry?.id === item.id && <small className="error">{dependencies(data,deleteEntry).length ? `Gesperrt: ${dependencies(data,deleteEntry).join(', ')}` : 'Erneut klicken, um diesen Eintrag endgültig zu löschen.'}<button onClick={()=>setDeleteEntry(null)}>Abbrechen</button></small>}</article>)}
           <p>Die Daten bleiben in diesem Browser und auf dieser Website. Das Löschen der Websitedaten entfernt auch die Bibliothek.</p>
           <div className="button-row"><button onClick={() => downloadBackup(data)}>Sicherung exportieren</button><button onClick={() => input.current.click()}>Sicherung importieren</button></div>
           <input ref={input} type="file" accept=".json,application/json" hidden onChange={restore} /></>}

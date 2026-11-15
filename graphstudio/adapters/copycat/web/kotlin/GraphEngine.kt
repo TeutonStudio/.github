@@ -45,7 +45,7 @@ fun exportDocument(isBuilding:Boolean,document:dynamic):Json = if(isBuilding) {
     val b=building(document);BuildingGraphCompiler.validateMetadata(b)
     val g=requireNotNull(b.graph).withCurrentSchema();BuildingGraphCompiler.structure(g)
     encodeBuilding(b.copy(schema=2,graph=g))
-} else encodeForm(Geometry.validate(form(document)))
+} else { val f=form(document);encodeForm(Geometry.validate(f.copy(graph=f.graph?.withTransformSchema()))) }
 
 @JsExport
 fun graphModels(): Json = json(
@@ -159,7 +159,7 @@ fun replaceGraphNodes(isBuilding:Boolean,document:dynamic,nodes:Array<dynamic>):
 } else {
     val original=formGraph(document.graph)
     val captured=GraphGroups.captureLayouts(original.nodeGroups,original.nodes.associate { it.id to GraphGroupPosition(it.x,it.y) })
-    encodeNodeGraph(GraphGroups.synchronize(original,original.copy(nodes=nodes.map(::decodeGraphNode),nodeGroups=captured)))
+    encodeNodeGraph(GraphGroups.synchronize(original,original.copy(nodes=nodes.map(::decodeGraphNode),nodeGroups=captured)).withTransformSchema())
 }
 
 @JsExport
@@ -215,24 +215,24 @@ private fun fullBlock(key: MeshKey, positions: List<P>) = json(
 )
 
 @JsExport
-fun previewGraph(isBuilding: Boolean, document: dynamic, library: dynamic, selected: String): Json {
+fun previewGraph(isBuilding: Boolean, document: dynamic, library: dynamic, selected: String, surfaces:dynamic=null): Json {
     if (!isBuilding) {
         val original = form(document)
         Geometry.validateMetadata(original)
         val graph = requireNotNull(original.graph) { "Missing form graph" }
         val n = if(selected.isEmpty()) graph.nodes.single { it.kind==NodeKind.OUTPUT }
             else graph.nodes.firstOrNull { it.id==selected } ?: error("Select an existing node")
-        if(n.kind==NodeKind.ROTATION) {
+        if(n.kind in CopycatTransforms.valueKinds) {
             GraphCompiler.structure(graph,original.groups)
             return json("count" to 0, "raw" to 0, "meshes" to emptyArray<Json>(),
-            "value" to "${n.rotationAxis.name}: ${n.quarterTurns*90}°", "warnings" to arrayOf("Rotationswert, keine Geometrie"))
+            "value" to when(n.kind) { NodeKind.POSITION->"Versatz: ${n.translation ?: P()} hB";NodeKind.MIRRORING->"Spiegelung: ${(n.mirror ?: CopycatMirror()).plane}";else->"${n.rotationAxis.name}: ${n.quarterTurns*90}°" }, "warnings" to arrayOf("Parameterwert, keine Geometrie"))
         }
         val parts = if(selected.isEmpty()) GraphCompiler.compile(graph,original.groups) else GraphCompiler.intermediate(graph,n.id,original.groups)
         val filter = if(n.kind==NodeKind.OUTPUT) n.previewGroup else ""
         val resolved = Geometry.resolve(parts,original.groups)
         val meshes = geometryMeshes(resolved,listOf(P()),"form",filter) { it }
         return json("count" to resolved.owned.values.sumOf { it.count() }, "raw" to if(parts.isEmpty()) 0 else Extrusion.cost(parts,original.groups),
-            "meshes" to meshes.toTypedArray())
+            "materials" to MaterialRequirements.form(parts,original.groups,map(surfaces) { obj,key -> obj[key] as String }).mapValues { it.value.toString() }.asJson(), "meshes" to meshes.toTypedArray())
     }
     val b = building(document)
     BuildingGraphCompiler.validateMetadata(b)
@@ -244,9 +244,9 @@ fun previewGraph(isBuilding: Boolean, document: dynamic, library: dynamic, selec
         BuildingGraphCompiler.structure(graph)
         return json("count" to 0,"raw" to 0,"meshes" to emptyArray<Json>(),"value" to "Anzahl: ${selectedNode.countValue ?: 0}")
     }
-    if(selectedNode?.kind in setOf(BuildingKind.ROTATION,BuildingKind.MIRRORING)) {
+    if(selectedNode?.kind in setOf(BuildingKind.ROTATION,BuildingKind.MIRRORING,BuildingKind.POSITION)) {
         BuildingGraphCompiler.structure(graph)
-        val value=if(selectedNode!!.kind==BuildingKind.ROTATION) selectedNode.rotations.orEmpty().joinToString(" → ") { "${it.axis}: ${it.quarterTurns*90}°" } else selectedNode.mirrors.orEmpty().joinToString(" → ") { it.plane.name }
+        val value=if(selectedNode!!.kind==BuildingKind.POSITION) "Versatz: ${selectedNode.translation}" else if(selectedNode.kind==BuildingKind.ROTATION) selectedNode.rotations.orEmpty().joinToString(" → ") { "${it.axis}: ${it.quarterTurns*90}°" } else selectedNode.mirrors.orEmpty().joinToString(" → ") { it.plane.name }
         return json("count" to 0,"raw" to 0,"meshes" to emptyArray<Json>(),"value" to value.ifEmpty { "Identität (leere Liste)" })
     }
     val plan = if(selected.isEmpty()) BuildingGraphCompiler.compile(b,forms,modules).plan
@@ -262,7 +262,7 @@ fun previewGraph(isBuilding: Boolean, document: dynamic, library: dynamic, selec
         if (key.block.isNotEmpty()) listOf(fullBlock(key, positions))
         else geometryMeshes(Geometry.resolve(key.parts,key.groups),positions,key.component) { id -> key.surfaces[id] ?: key.material }
     }
-    return json("count" to plan.placements.size, "raw" to plan.raw, "materials" to plan.materials.mapValues { it.value.toString() }.asJson(),
+    return json("count" to plan.placements.size, "raw" to plan.raw, "materials" to MaterialRequirements.aggregate(plan.materials).mapValues { it.value.toString() }.asJson(),
         "warnings" to plan.warnings.toTypedArray(), "meshes" to meshes.toTypedArray())
 }
 
@@ -481,4 +481,24 @@ fun editInspectorNode(isBuilding:Boolean,document:dynamic,value:dynamic):Json {
     changed=changed.replace(next).remapGeometryDependents(original).withCurrentSchema()
     BuildingGraphCompiler.structure(changed)
     return encodeBuildingGraph(changed)
+}
+
+@JsExport
+fun duplicateGraph(isBuilding:Boolean,document:dynamic,ids:Array<String>,copies:Array<String>):Json = if(isBuilding) {
+    encodeBuilding(building(document).let { it.copy(graph=GraphDuplicates.building(requireNotNull(it.graph),ids.toList(),copies.toList())) })
+} else encodeForm(form(document).let {it.copy(graph=GraphDuplicates.shape(requireNotNull(it.graph),it.groups,ids.toList(),copies.toList()))})
+
+/** Repairable node diagnostics do not mutate a document or discard its last valid preview. */
+@JsExport
+fun transformDiagnostics(isBuilding:Boolean,document:dynamic,library:dynamic):Array<Json> = if(!isBuilding) {
+    val f=form(document);val graph=requireNotNull(f.graph)
+    graph.nodes.filter { !it.copycatTransforms.isNullOrEmpty() || it.kind in CopycatTransforms.operatorKinds }.mapNotNull { n ->
+        runCatching { GraphCompiler.intermediate(graph,n.id,f.groups) }.exceptionOrNull()?.let { json("nodeId" to n.id,"message" to (it.message ?: "Invalid Copycat transformation")) }
+    }.toTypedArray()
+} else {
+    val b=building(document);val graph=requireNotNull(b.graph)
+    val evaluation=BuildingGraphCompiler.Evaluation(graph,b.palette,map(library.forms) {obj,key->form(obj[key])},map(library.modules) {obj,key->module(obj[key])})
+    graph.nodes.filter { !it.copycatTransforms.isNullOrEmpty() || it.kind in BuildingCopycatTransforms.operatorKinds }.mapNotNull { n ->
+        runCatching { evaluation.preview(n.id) }.exceptionOrNull()?.let { json("nodeId" to n.id,"message" to (it.message ?: "Invalid Copycat transformation")) }
+    }.toTypedArray()
 }

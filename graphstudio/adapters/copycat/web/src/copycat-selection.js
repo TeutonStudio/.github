@@ -15,10 +15,13 @@ function selectedSource(option, library) {
     raw = library.forms[option.reference]
   }
   const document = readGraph(raw, 'form')
+  const referenceVersion=option.kind === 'library' ? Number(option.reference.match(/@(\d+)$/)?.[1] || document.version || 1) : null
+  const referenceIdentity=option.kind === 'library' ? document.id || option.reference.replace(/@\d+$/,'') : null
   const name = option.name || option.entry?.name || document.name || 'Copycat'
   return {
     ...option.entry,
     id: option.entry?.id || option.id,
+    ...(option.kind === 'library' ? {documentId:referenceIdentity,version:referenceVersion} : {}),
     name,
     document: { ...document, name },
     materials: option.materials ?? option.entry?.materials ?? {},

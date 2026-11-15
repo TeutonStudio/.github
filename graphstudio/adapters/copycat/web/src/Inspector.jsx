@@ -2,13 +2,12 @@ import { useState } from 'react'
 import { TransformValues } from './TransformValues.jsx'
 import { ArrangementGrid } from './ArrangementGrid.jsx'
 import { NativeFields } from './NativeFields.jsx'
-import { sourceMounting, mountSource } from './generated/engine.mjs'
 import { formGroups, model } from './model.js'
 import { MaterialField } from './Workspace.jsx'
 import { copycatShapeNames } from './copycat-options.js'
 
 export const names = {
-  INT: 'Anzahl', ROTATION_SEGMENT: 'Rotationssegment', AREA: 'Fläche', SEGMENT_LAYOUT: 'Segmentanordnung', ROOM_GEOMETRY: 'Raumgrundriss', ROOF_LEVEL: 'Dachebene', ROOF_LAYOUT: 'Dachanordnung', STAIRWELL: 'Treppenhaus', ELEVATOR_SHAFT: 'Aufzugsschacht', SERVICE_SHAFT: 'Installationsschacht', GARDEN: 'Garten', PATH: 'Weg', ROOM_LAYOUT: 'Raumanordnung', BAY_WINDOW: 'Erker', DORMER: 'Gaube',
+  POSITION:'Position (hB)', TRANSLATE:'Copycat positionieren', COPYCAT_POSITION:'Copycat positionieren', INT: 'Anzahl', ROTATION_SEGMENT: 'Rotationssegment', AREA: 'Fläche', SEGMENT_LAYOUT: 'Segmentanordnung', ROOM_GEOMETRY: 'Raumgrundriss', ROOF_LEVEL: 'Dachebene', ROOF_LAYOUT: 'Dachanordnung', STAIRWELL: 'Treppenhaus', ELEVATOR_SHAFT: 'Aufzugsschacht', SERVICE_SHAFT: 'Installationsschacht', GARDEN: 'Garten', PATH: 'Weg', ROOM_LAYOUT: 'Raumanordnung', BAY_WINDOW: 'Erker', DORMER: 'Gaube',
   INPUT: 'Grundform', UNION: 'Vereinigung', INTERSECTION: 'Schnitt', DIFFERENCE: 'Differenz',
   SYMMETRIC_DIFFERENCE: 'Symmetrische Differenz', ROTATE: 'Copycat rotieren', ROTATION: 'Rotation', OUTPUT: 'Ergebnis',
   SAVED: 'Gespeicherter Copycat', MIRROR: 'Copycat spiegeln',
@@ -29,6 +28,8 @@ export function portName(port, node) {
     return port.id.slice(9).split(':').map(word => words[word] || word).join(' · ')
   }
   if (port.id.startsWith('edge:')) return `Wandkante ${port.id.slice(5)}`
+  if (port.id === 'positionValue') return 'Position (hB)'
+  if (['MIRROR','TRANSLATE'].includes(node.kind) && port.id === '1') return node.kind === 'MIRROR' ? 'Spiegelung' : 'Position (hB)'
   if (port.id === 'rotation') return 'Rotationen'
   if (port.id === 'mirroring') return 'Spiegelungen'
   const [kind, key] = port.id.split(':')
@@ -77,9 +78,7 @@ export function Field({ label, value, onChange, options, type = 'text', min, max
     }} /></label>
 }
 
-const directions = [[2, 'Nord (−Z)'], [3, 'Ost (+X)'], [0, 'Süd (+Z)'], [1, 'West (−X)']]
 const angles = [[0, '0°'], [1, '90°'], [2, '180°'], [3, '270°']]
-const mountings = [['up', 'Oben (+Y)'], ['down', 'Unten (−Y)'], ['east', 'Seitlich +X'], ['west', 'Seitlich −X'], ['south', 'Seitlich +Z'], ['north', 'Seitlich −Z']]
 const axes = [['X', 'X · Ost/West'], ['Y', 'Y · Höhe'], ['Z', 'Z · Süd/Nord'], ['NORMAL', 'Lokale Normale']]
 const groupOptions = (groups, empty) => [['', empty], ...groups.map(group => [group.id, group.name])]
 const materialModes = [['SEPARATED', 'Separiert'], ['GROUPED', 'Gruppiert']]
@@ -87,7 +86,7 @@ const viewFilters = [['all', 'Alles'], ['walls', 'Wände'], ['floor', 'Boden'], 
 const typeNames = [['flat', 'Flachdach'], ['gable', 'Satteldach']]
 
 function NumberGrid({ entries, keys, ranges, update, prefix, scale = 1, unit = '' }) {
-  return entries.map((entry, index) => <div key={index} className="number-grid">
+  return entries.map((entry, index) => <div key={index} className="number-grid" style={{'--coordinate-count':keys.length}}>
     {keys.map(key => <Field key={key} label={`${prefix} ${index + 1} · ${key.toUpperCase()}${unit ? ` (${unit})` : ''}`} value={entry[key] * scale} type="number"
       step={scale} min={ranges[key][0] * scale} max={ranges[key][1] * scale} onChange={value => { if (Number.isInteger(value / scale)) update(index, { ...entry, [key]: value / scale }) }} />)}
   </div>)
@@ -116,19 +115,12 @@ export function NodeFields({ mode, node, document, edit, library, onChooseCopyca
       {node.kind === 'SAVED' && copycatPicker}
       {node.kind === 'MIRROR' && <Field label="Spiegelebene" value={node.mirror?.plane || 'X'} options={model.mirrorPlanes} onChange={plane => edit({ mirror: { plane } })} />}
       {node.kind === 'INPUT' && adapter && <>
-        {copycatPicker}
-        {partField('size', 'Größe', undefined, 'number', 1, adapter.max)}
-        {partField('turn', 'Drehung um Y', directions)}
-        {partField('spin', 'Drehung um die lokale Normale', angles)}
-        <Field label="Neigung" value={sourceMounting(part)} options={mountings.map(([id, label]) => [id, label, !adapter.tiltable && !['up', 'down'].includes(id)])} onChange={normal => edit({ part: { ...part, ...mountSource(part, normal) } })} />
+        <div className="copycat-source-row">{copycatPicker}{adapter.max > 1 && <label className="copycat-size">Größe<span className="compact-stepper"><input aria-label="Größe" type="number" min="1" max={adapter.max} step="1" value={part.size} onChange={event=>{const value=Number(event.target.value);if(Number.isInteger(value) && value>=1 && value<=adapter.max) edit({part:{...part,size:value}})}}/><span><button type="button" aria-label="Größe erhöhen" disabled={part.size>=adapter.max} onClick={()=>edit({part:{...part,size:part.size+1}})}>▴</button><button type="button" aria-label="Größe verringern" disabled={part.size<=1} onClick={()=>edit({part:{...part,size:part.size-1}})}>▾</button></span></span></label>}</div>
         {part.source === 'copycats:copycat_flat_pane' && partField('discCut', 'Scheibenanteil', undefined, 'number', 0, 2)}
-        <p className="hint">{!adapter.tiltable && 'Diese native Quelle erlaubt nur Oben/Unten. '}Neigung richtet die lokale Normale aus. Drehung um Y dreht die Form einschließlich ihrer Neigung.</p>
         {partField('group', 'Materialgruppe', groups.map(group => [group.id, group.name]))}
-        <NumberGrid entries={[part.offset]} keys={['x', 'y', 'z']} ranges={{ x: [-15, 15], y: [-15, 15], z: [-15, 15] }}
-          prefix="Versatz" unit="hB" update={(_, offset) => edit({ part: { ...part, offset } })} />
       </>}
       {['ROTATE', 'ROTATION'].includes(node.kind) && <>
-        {field('rotationAxis', 'Achse', axes)}
+        {field('rotationAxis', 'Achse', axes.filter(([axis]) => document.graph.schema < 4 || axis !== 'NORMAL'))}
         {field('quarterTurns', 'Drehwinkel', angles)}
       </>}
       {groupFields && field('materialMode', 'Materialmodus', materialModes)}

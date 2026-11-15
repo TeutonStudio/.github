@@ -1,68 +1,55 @@
-import { cpSync, existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync, symlinkSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { root, run, treeHash } from './common.mjs'
-
-const args = process.argv.slice(2), paths = {}
-for (let i = 0; i < args.length; i += 2) {
-  if (!['--copycat', '--ccvisual'].includes(args[i]) || !args[i + 1]) throw new Error('Usage: npm run internal -- [--copycat /repo] [--ccvisual /repo]')
-  paths[args[i].slice(2)] = resolve(args[i + 1])
+const args=process.argv.slice(2), paths={}
+for(let i=0;i<args.length;i+=2) {
+  if(!['--copycat','--local'].includes(args[i]) || !args[i+1]) throw new Error('Usage: npm run internal -- --copycat /development-core [--local /local-mod]')
+  paths[args[i].slice(2)]=resolve(args[i+1])
 }
-paths.copycat ??= resolve(root, '../../Copycat Architect')
-paths.ccvisual ??= resolve(root, '../../CCVisual')
-const output = join(root, '.internal-dist')
-rmSync(output, { recursive: true, force: true })
-cpSync(join(root, 'shell'), output, { recursive: true })
-cpSync(join(root, '../docs/GRAPHSTUDIO.md'), join(output, 'plan.md'))
-const adapters = []
-let failed = false
-function sourceInfo(path) {
-  return { sourceCommit: run('git', ['rev-parse', 'HEAD'], path, true),
-    workingTree: run('git', ['status', '--porcelain'], path, true) ? 'modified' : 'clean',
-    sourceSha256: treeHash(join(path, 'src/main')) }
+if(!paths.copycat) throw new Error('Specify the development core with --copycat. Public builds still require the clean published source pin.')
+const source=paths.copycat, development=join(root,'.cache/copycat-development'), web=join(development,'web'), adapter=join(root,'adapters/copycat/web'), output=join(root,'.internal-dist')
+if(!existsSync(join(source,'gradlew'))) throw new Error('No native Copycat checkout')
+const before=treeHash(join(source,'src/main')), adapterBefore=treeHash(adapter)
+mkdirSync(web,{recursive:true})
+// The organization adapter is a build overlay, never a second editor in the mod checkout.
+for(const name of ['src','examples','docs','build','LICENSE']) {
+ const link=join(development,name)
+ rmSync(link,{force:true,recursive:true})
+ symlinkSync(join(source,name),link,name==='LICENSE'?'file':'dir')
 }
-function testSummary(path) {
-  const directory = join(path, 'build/test-results/test')
-  const total = { tests: 0, failures: 0, errors: 0, skipped: 0 }
-  for (const file of readdirSync(directory).filter(name => name.endsWith('.xml'))) {
-    const header = readFileSync(join(directory, file), 'utf8').match(/<testsuite\b[^>]*>/)?.[0] || ''
-    for (const key of Object.keys(total)) total[key] += Number(header.match(new RegExp(`\\b${key}="(\\d+)"`))?.[1] || 0)
-  }
-  if (!total.tests || total.failures || total.errors) throw new Error('Native test report is empty or contains failures')
-  return total
+for(const name of ['src','test','kotlin','public','tools']) rmSync(join(web,name),{recursive:true,force:true})
+cpSync(adapter,web,{recursive:true,filter:path=>!['node_modules','dist','.tools','generated'].includes(path.split('/').at(-1))})
+run('./gradlew',['test','--tests','*GraphstudioExchangeTest.nativeCorpus','--tests','*CopycatTransformContractTest','--tests','*CopycatParameterPreviewTest','--offline','--rerun'],source)
+const coreChecks=report(source)
+// Honour dependency/lock changes even when reusing the development overlay.
+run('npm',['ci','--no-audit','--no-fund'],web)
+run('npm',['test'],web)
+run('./gradlew',['test','--tests','*GraphstudioExchangeTest.browserExports','--offline','--rerun'],source)
+function report(path) {
+ const totals={tests:0,failures:0,errors:0,skipped:0}
+ for(const file of readdirSync(join(path,'build/test-results/test')).filter(f=>f.endsWith('.xml'))) {
+  const header=readFileSync(join(path,'build/test-results/test',file),'utf8').match(/<testsuite\b[^>]*>/)?.[0] || ''
+  for(const key of Object.keys(totals)) totals[key]+=Number(header.match(new RegExp(`\\b${key}="(\\d+)"`))?.[1] || 0)
+ }
+ if(!totals.tests || totals.failures || totals.errors || totals.skipped) throw new Error('Mandatory native checks must pass without skipped cases')
+ return totals
 }
-for (const [id, path] of Object.entries(paths)) {
-  const entry = { id, name: id === 'copycat' ? 'Copycat Architect' : 'CC Visual', status: 'failed', checks: {} }
-  adapters.push(entry)
-  try {
-    if (!existsSync(join(path, 'gradlew'))) throw new Error(`No mod checkout: ${path}`)
-    Object.assign(entry, sourceInfo(path))
-    // Re-run tests so a previous report cannot be mistaken for this development stand.
-    run('./gradlew', ['test', '--offline', '--rerun'], path)
-    entry.checks.nativeTests = testSummary(path)
-    if (id === 'copycat') {
-      const web = join(path, 'web/graph-editor')
-      if (!existsSync(join(web, 'package.json'))) throw new Error('Expected local TypeScript prototype in web/graph-editor')
-      run('npm', ['test'], web)
-      run('npm', ['run', 'build'], web)
-      cpSync(join(web, 'dist'), join(output, 'copycat'), { recursive: true })
-      entry.url = './copycat/'
-      entry.status = 'internal-prototype'
-      entry.checks.browserTests = 'passed'
-      entry.note = 'Lokaler TypeScript-Prototyp. JVM- und Browsertests sind getrennt; ein Browser→Mod-Austausch ist hier noch nicht nachgewiesen.'
-    } else {
-      entry.status = 'native-tested'
-      entry.note = 'Native Modelltests ausgeführt. Den KilaGraph-Editor im Minecraft-Client prüfen; der Browseradapter ist geplant.'
-    }
-    // Detect edits during a long-running test/build, including uncommitted changes.
-    if (entry.sourceSha256 !== treeHash(join(path, 'src/main'))) throw new Error('Sources changed during verification; run again')
-  } catch (error) {
-    failed = true
-    delete entry.url
-    entry.status = 'failed'
-    entry.note = error.message
-    console.error(`${entry.name}: ${error.message}`)
-  }
+const native={core:coreChecks,browserExports:report(source)}
+if(paths.local) {
+ const exchange=join(source,'build/graphstudio-exchange')
+ const old=process.env.GRAPHSTUDIO_EXCHANGE;process.env.GRAPHSTUDIO_EXCHANGE=exchange
+ run('./gradlew',['test','--tests','*GraphstudioExchangeBridgeTest','--tests','*CopycatTransformContractTest','--tests','*CopycatParameterPreviewTest','--offline','--rerun'],paths.local)
+ process.env.GRAPHSTUDIO_EXCHANGE=old
+ report(paths.local)
+ run('node',['tools/local-exchange.mjs',exchange],web)
+ run('./gradlew',['test','--tests','*GraphstudioExchangeTest.localBrowserExports','--offline','--rerun'],source)
+ report(source)
 }
-writeFileSync(join(output, 'studio.json'), JSON.stringify({ schema: 1, channel: 'internal', builtAt: new Date().toISOString(), adapters }, null, 2) + '\n')
-console.log(`Internal results: ${output}. Preview: npm run preview -- --internal`)
-if (failed) process.exitCode = 1
+process.env.VITE_STUDIO_CHANNEL='internal'
+run('npm',['run','build'],web)
+if(before!==treeHash(join(source,'src/main')) || adapterBefore!==treeHash(adapter)) throw new Error('Core or adapter sources changed during the checks; repeat verification')
+rmSync(output,{recursive:true,force:true});cpSync(join(root,'shell'),output,{recursive:true});cpSync(join(web,'dist'),join(output,'copycat'),{recursive:true})
+const compatibility=JSON.parse(readFileSync(join(web,'dist/compatibility.json'),'utf8'))
+const entry={id:'copycat',name:'Copycat Architect',status:'internal-development',url:'./copycat/',sourceCommit:run('git',['rev-parse','HEAD'],source,true),sourceSha256:before,adapterSha256:treeHash(adapter),workingTree:run('git',['status','--porcelain'],source,true)?'modified':'clean',checks:{native,browser:'passed',browserExportsInJvm:'passed',localJvm:paths.local?'passed':'not-requested'},compatibility,note:'Organisationseditor mit unveröffentlichtem Entwicklungsfachkern. Keine Freigabe für den öffentlichen Kanal.'}
+writeFileSync(join(output,'studio.json'),JSON.stringify({schema:1,channel:'internal',builtAt:new Date().toISOString(),adapters:[entry]},null,2)+'\n')
+console.log(`Internal Graphstudio: ${output}. No deployment or public pin changed.`)

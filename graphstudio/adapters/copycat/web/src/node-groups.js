@@ -1,3 +1,5 @@
+import { parseMaterial } from './materials.js'
+import { validateReferences } from './documents.js'
 import { remapBuildingReferences } from './generated/engine.mjs'
 import { applyWires, connections, formGroups, inspect, protectedNode, replaceNodes } from './model.js'
 
@@ -86,4 +88,25 @@ export function mergeLibraries(current, incoming) {
     result[type] = { ...current[type], ...incoming[type] }
   }
   return result
+}
+
+/** Validate a private library draft through the same insertion/type/reference path. */
+export function validateNodeGroup(template) {
+  if(!template || !['form','building'].includes(template.mode) || typeof template.name !== 'string' || !template.name.trim() || template.name.length>64 || !['nodes','wires','groups'].every(key=>Array.isArray(template[key])) || (template.schema !== undefined && template.schema !== 1)) throw new Error('Ungültiges Knotengruppenschema oder unvollständige Knotengruppe.')
+  if(!template.nodes.length || template.nodes.some(protectedNode)) throw new Error('Die Knotengruppe benötigt bearbeitbare Knoten ohne Ergebnis- oder Pflichtknoten.')
+  if(template.nodes.some(node=>typeof node.id !== 'string' || !/^[a-zA-Z0-9_-]{1,36}$/.test(node.id))) throw new Error('Gruppenknoten benötigen gültige Kennungen.')
+  if(template.materials != null && (Array.isArray(template.materials) || typeof template.materials !== 'object' || Object.values(template.materials).some(value=>typeof value !== 'string'))) throw new Error('Materialien müssen eine Zuordnung von Kennungen zu Materialtexten sein.')
+  for(const value of Object.values(template.materials || {})) if(value.trim()) parseMaterial(value.trim())
+  const ids=new Set(template.nodes.map(node=>node.id))
+  if(ids.size!==template.nodes.length || template.wires.some(wire=>!ids.has(wire.source) || !ids.has(wire.target))) throw new Error('Eine Verbindung verweist auf einen fehlenden Gruppenknoten.')
+  if(template.mode === 'form') {
+    const groups=new Set(template.groups.map(group=>group.id))
+    const refs=template.nodes.flatMap(node=>[node.part?.group,...(node.savedCopycat?.parts || []).map(part=>part.group),node.materialGroup,node.previewGroup,...(node.inputGroups || [])]).filter(Boolean)
+    if(!groups.size || refs.some(id=>!groups.has(id))) throw new Error('Die Knotengruppe verweist auf eine fehlende Materialgruppe.')
+  }
+  const base=template.mode === 'form' ? {schema:3,name:'Validation',graph:{schema:2,nodes:[{id:'result',kind:'OUTPUT',inputs:['']}]}} : {schema:2,name:'Validation',graph:{schema:1,nodes:[{id:'empty_wall',kind:'SEGMENT',block:'minecraft:air',length:1},{id:'result',kind:'BUILDING'}]}}
+  let index=0
+  const inserted=insertNodeGroup(base,template,()=>`validation_${index++}`)
+  validateReferences(inserted.document,template.library || {})
+  return template
 }

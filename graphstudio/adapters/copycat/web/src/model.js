@@ -1,4 +1,4 @@
-import { applyGraphDiagram, replaceGraphNodes, exportDocument, editInspectorNode, normalizeDocument, wireModels, compileForm, graphModels, inspectGraph, prepareForm } from './generated/engine.mjs'
+import { duplicateGraph, applyGraphDiagram, replaceGraphNodes, exportDocument, editInspectorNode, normalizeDocument, wireModels, compileForm, graphModels, inspectGraph, prepareForm } from './generated/engine.mjs'
 
 export const model = { ...graphModels(), mirrorPlanes: wireModels().enums.CopycatMirrorPlane }
 export const defaults = [{ id: 'body', name: 'Body', role: 'surface', priority: 0 }]
@@ -91,4 +91,19 @@ export function validateLibrary(data) {
 
 export function editNode(mode, document, node) {
   return { ...document, graph: retainedGraph(document, editInspectorNode(mode === 'building', document, node)) }
+}
+
+// The domain owns IDs, positions and rewiring. The browser also retains extension
+// metadata on original nodes and their copies, just as every other edit does.
+export function duplicateSelection(mode, document, ids, copies) {
+  const result=duplicateGraph(mode === 'building',document,ids,copies)
+  const mapping=new Map(ids.map((id,index)=>[id,copies[index]]))
+  const copied=ids.map((id,index)=>({...structuredClone(document.graph.nodes.find(node=>node.id === id)),id:copies[index]}))
+  const groups=result.graph.nodeGroups || []
+  const copiedGroups=groups.filter(group=>!document.graph.nodeGroups?.some(old=>old.id === group.id)).map(group=>{
+    const source=document.graph.nodeGroups?.find(old=>old.nodes.length === group.nodes.length && old.nodes.every(id=>group.nodes.includes(mapping.get(id))))
+    return source ? {...structuredClone(source),...group} : group
+  })
+  const candidate={...document,graph:{...document.graph,nodes:[...document.graph.nodes,...copied],nodeGroups:[...(document.graph.nodeGroups || []),...copiedGroups]}}
+  return retainShape(candidate,normalizeDocument(mode === 'building',candidate),result)
 }
