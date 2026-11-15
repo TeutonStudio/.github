@@ -4,7 +4,7 @@ Geprüfter Fachkern: [79f5157](https://github.com/TeutonStudio/Copycat-Architect
 
 ## Automatische Prüfung
 
-- Vollständiger Fachkernlauf: 597 Fälle, 595 bestanden, keine Fehler. Zwei optionale lokale JVM-Brückentests sind außerhalb dieses reinen Graphstudio-Auftrags nicht angefordert.
+- Vollständiger Fachkernlauf: 597 Fälle, 595 bestanden, keine Fehler. Zwei optionale Vorlagen-Snapshotfälle benötigen separat bereitgestellte Vorlagen über Umgebungsvariablen und waren nicht aktiviert.
 - Anschließender Pflichtlauf: sechs Wertregressionen und JVM-Prüfung der Browser-Rückgabe bestanden, kein Fall übersprungen.
 - Browser: 185 Tests bestanden, kein Fall übersprungen.
 - Gemeinsamer Austausch: 17 Fälle von JVM über Browser zurück zur JVM, darunter neue Vektorrechnung, typisierte Gruppenbindung, Versionsmetadaten, ältere optionale Anschlüsse und Säulen mit Anzahl-Rechnung.
