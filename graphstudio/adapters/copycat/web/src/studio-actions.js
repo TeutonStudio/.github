@@ -16,17 +16,19 @@ export function duplicateNodes(mode, document, ids, copies, withConnections = tr
   const originalGroups = new Set((document.graph.nodeGroups || []).map(group => group.id))
   next = {...next,graph:{...next.graph,nodeGroups:(next.graph.nodeGroups || []).map(group => originalGroups.has(group.id) ? group : {...group,definitionId:group.id,inputConnections:{}})}}
   const entries = inspect(mode,next), copied = new Set(copies)
-  return applyWires(mode,next,entries,connections(entries).filter(wire => !copied.has(wire.target)))
+  const internals=(next.graph.nodeGroups || []).filter(group=>!originalGroups.has(group.id) && (group.libraryReference || group.presentation==='vectorSplit')).map(group=>new Set(group.nodes))
+  return applyWires(mode,next,entries,connections(entries).filter(wire => !copied.has(wire.target) || internals.some(members=>members.has(wire.source) && members.has(wire.target))))
 }
-export function referenceDisabled(entry, currentIdentity, readOnly = false) {
+export function referenceDisabled(entry, currentIdentity, readOnly = false, mode) {
   if (readOnly) return 'Gespeicherte Versionen können nur betrachtet werden. Zuerst Ungespeichert wählen.'
   if (!entry) return 'Einen Bibliothekseintrag auswählen.'
   if (identityOf(entry) === currentIdentity) return 'Keine Version des eigenen Graphen als Referenz einfügen.'
-  if (entry.collection === 'nodeGroups' || entry.mode !== 'form') return 'Als Copycat-Knoten können gespeicherte Formen eingefügt werden.'
+  if(mode==='form' && entry.mode==='building') return 'Diese Referenz benötigt den Gebäudegraphen.'
+  if(mode==='building' && entry.collection==='nodeGroups' && entry.mode==='form') return ''
   return ''
 }
 export function insertFormReference({mode,document,library,materials,entry,currentIdentity}) {
-  const reason = referenceDisabled(entry,currentIdentity)
+  const reason = referenceDisabled(entry,currentIdentity,false,mode)
   if (reason) throw new Error(reason)
   const result = mode === 'building' ? {...loadBuildingCopycat(document,library,entry),materials} : {...loadFormCopycatWithMaterials(document,entry,undefined,materials),library}
   const occupied=inspect(mode,document).map(({node,ports})=>({x:node.x,y:node.y,height:70+ports.length*24}))
@@ -40,7 +42,7 @@ export function insertFormReference({mode,document,library,materials,entry,curre
   return result
 }
 export function savedReferences(document) {
-  return [...new Set(document.graph.nodes.filter(node => node.libraryReference).map(node => `${node.libraryReference.documentId}@${node.libraryReference.version}`))]
+  return [...new Set([...(document.graph.nodeGroups || []).filter(group=>group.libraryReference).map(group=>`${group.libraryReference.documentId}@${group.libraryReference.version}`),...document.graph.nodes.filter(node => node.libraryReference).map(node => `${node.libraryReference.documentId}@${node.libraryReference.version}`)])]
 }
 
 const noMaterials=Object.freeze({})

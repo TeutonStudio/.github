@@ -1,7 +1,12 @@
+import { IntegerField } from './IntegerField.jsx'
+import { MirrorPlanePicker } from './MirrorPlanePicker.jsx'
 import { model } from './model.js'
 import { useEffect, useState } from 'react'
 const labels = { ROTATE: 'Drehen', MIRROR: 'Spiegeln', POSITION: 'Bewegen' }
-const point = (value = {}, change, label, min, max) => <fieldset className="coordinate-grid" style={{ '--coordinate-count': 3 }}><legend>{label}</legend>{['x','y','z'].map(key => <label key={key}>{key.toUpperCase()}<input aria-label={`${label} ${key.toUpperCase()}`} type="number" min={min} max={max} step="1" value={value[key] || 0} onChange={e => { const n = Number(e.target.value); if (Number.isInteger(n) && n >= min && n <= max) change({ x: 0, y: 0, z: 0, ...value, [key]: n }) }} /></label>)}</fieldset>
+const point = (value, change, label, min = 0, max = 16) => {
+  const coordinates=value || {x:0,y:0,z:0}
+  return <fieldset className="coordinate-grid" style={{ '--coordinate-count': 3 }}><legend>{label}</legend>{['x','y','z'].map(key=><IntegerField key={key} label={key.toUpperCase()} ariaLabel={`${label} ${key.toUpperCase()}`} value={coordinates[key] ?? 0} min={min} max={max} onChange={n=>change({...coordinates,[key]:n})}/>)}</fieldset>
+}
 export function CopycatTransforms({ node, edit, primary = false }) {
   const [steps, setSteps] = useState(node.copycatTransforms || [])
   useEffect(() => setSteps(node.copycatTransforms || []), [node])
@@ -11,8 +16,8 @@ export function CopycatTransforms({ node, edit, primary = false }) {
     <p className="hint">Nach der Knotenauswertung · Reihenfolge über alle Abschnitte · hB = 1/16 Block</p>
     {primary && ['ROTATE','ROTATION','COPYCAT_ROTATE','MIRRORING','POSITION','TRANSLATE','COPYCAT_POSITION'].includes(node.kind) && <fieldset><legend>Operator / Parameterwert</legend>
       {['ROTATE','ROTATION','COPYCAT_ROTATE'].includes(node.kind) && point(node.rotationPivot || { x:8,y:8,z:8 }, value => edit({ rotationPivot:value }), 'Drehpunkt (hB)', 0,16)}
-      {['POSITION','TRANSLATE','COPYCAT_POSITION'].includes(node.kind) && point(node.translation, value => edit({ translation:value }), 'Relativer Versatz (hB)', -16,16)}
-      {node.kind === 'MIRRORING' && <label>Ebene<select value={node.mirror?.plane || 'X'} onChange={e => edit({ mirror: {plane:e.target.value} })}>{model.mirrorPlanes.map(p => <option key={p}>{p}</option>)}</select></label>}
+      {['POSITION','TRANSLATE','COPYCAT_POSITION'].includes(node.kind) && point(node.translation, value => edit({ translation:value }), 'Position (hB)', 0,node.kind === 'POSITION' ? 2147483647 : 16)}
+      {node.kind === 'MIRRORING' && <MirrorPlanePicker value={node.mirror?.plane || 'X'} onChange={plane=>edit({mirror:{plane}})}/>}
     </fieldset>}
     {!['ROTATION','MIRRORING','POSITION'].includes(node.kind) && <>
     {Object.entries(labels).map(([kind, label]) => <fieldset key={kind}><legend>{label}</legend>
@@ -21,8 +26,8 @@ export function CopycatTransforms({ node, edit, primary = false }) {
         {kind === 'ROTATE' && <><label>Achse<select value={step.axis || 'Y'} onChange={e => change(index,{axis:e.target.value})}>{['X','Y','Z'].map(axis => <option key={axis}>{axis}</option>)}</select></label>
           <label>Winkel<select value={step.quarterTurns ?? 1} onChange={e => change(index,{quarterTurns:Number(e.target.value)})}>{[0,1,2,3].map(q => <option key={q} value={q}>{q*90}°</option>)}</select></label>
           {point(step.pivot || {x:8,y:8,z:8},value => change(index,{pivot:value}),'Drehpunkt (hB)',0,16)}</>}
-        {kind === 'MIRROR' && <label>Ebene<select value={step.plane || 'X'} onChange={e => change(index,{plane:e.target.value})}>{model.mirrorPlanes.map(p => <option key={p}>{p}</option>)}</select></label>}
-        {kind === 'POSITION' && point(step.offset,value => change(index,{offset:value}),'Versatz (hB)',-16,16)}
+        {kind === 'MIRROR' && <MirrorPlanePicker value={step.plane || 'X'} onChange={plane=>change(index,{plane})}/>}
+        {kind === 'POSITION' && point(step.offset,value => change(index,{offset:value}),'Versatz (hB)',0,16)}
         <button onClick={() => setSteps(steps.filter((_,i) => i !== index))}>Schritt {index + 1} entfernen</button>
       </div>)}
       <button disabled={steps.length >= 64} onClick={() => setSteps([...steps, { kind, enabled:true, axis:'Y', quarterTurns:1, pivot:{x:8,y:8,z:8}, plane:'X', offset:{x:0,y:0,z:0} }])}>+ {label}</button>

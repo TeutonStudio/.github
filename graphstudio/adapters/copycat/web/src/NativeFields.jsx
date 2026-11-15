@@ -1,3 +1,5 @@
+import { IntegerField } from './IntegerField.jsx'
+import { MirrorPlanePicker } from './MirrorPlanePicker.jsx'
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { inspectorContext, wireModels, editNativeGroup, groupInterfaceContext, editGroupInterface } from './generated/engine.mjs'
 
@@ -10,9 +12,9 @@ import { MaterialField } from './Workspace.jsx'
 const models = wireModels()
 const contextCarpets = model.carpets
 const Context = createContext({})
-const choiceLabels = { SEPARATED: 'Separiert', GROUPED: 'Gruppiert', NORMAL: 'Lokale Normale', FOOTPRINT: 'Aus Grundriss', SEGMENTS: 'Aus Segmenten', FLAT: 'Flachdach', PENT: 'Pultdach', GABLE: 'Satteldach', HIP: 'Walmdach', MANSARD: 'Mansarddach', HEIGHT: 'Firsthöhe', ANGLE: 'Dachneigung', rooms: 'Aus Räumen', walls: 'Aus Wänden', horizontal: 'Horizontal', vertical: 'Vertikal', depth: 'Tiefe', transform: 'Frei anordnen', flat: 'Flachdach', gable: 'Satteldach', AUTO: 'Automatisch', EXPLICIT: 'Explizit', OPEN: 'Offen', BOUNDARY: 'Raumgrenze', OPENING: 'Öffnung', STRUCTURE: 'Tragwerk', DECORATION: 'Dekoration' }
+const choiceLabels = { OVERLAY:'Vier Rotationen überlagern', ADJACENT:'Rotiert aneinander · 2×2 Blöcke', SEPARATED: 'Separiert', GROUPED: 'Gruppiert', NORMAL: 'Lokale Normale', FOOTPRINT: 'Aus Grundriss', SEGMENTS: 'Aus Segmenten', FLAT: 'Flachdach', PENT: 'Pultdach', GABLE: 'Satteldach', HIP: 'Walmdach', MANSARD: 'Mansarddach', HEIGHT: 'Firsthöhe', ANGLE: 'Dachneigung', rooms: 'Aus Räumen', walls: 'Aus Wänden', horizontal: 'Horizontal', vertical: 'Vertikal', depth: 'Tiefe', transform: 'Frei anordnen', flat: 'Flachdach', gable: 'Satteldach', AUTO: 'Automatisch', EXPLICIT: 'Explizit', OPEN: 'Offen', BOUNDARY: 'Raumgrenze', OPENING: 'Öffnung', STRUCTURE: 'Tragwerk', DECORATION: 'Dekoration' }
 const labels = {
-  countValue: 'Anzahl', roofType: 'Dachart', ridge: 'Firstrichtung', overhang: 'Dachüberhang', coordinates: 'Koordinaten', layoutCells: 'Zellenbelegung', assembly: 'Expliziter Aufbau', depth: 'Tiefe',
+  columnMode: 'Säulenaufbau', countValue: 'Anzahl', roofType: 'Dachart', ridge: 'Firstrichtung', overhang: 'Dachüberhang', coordinates: 'Koordinaten', layoutCells: 'Zellenbelegung', assembly: 'Expliziter Aufbau', depth: 'Tiefe',
   regionCopies: 'Copycats je Bereich', roofLevel: 'Dachebene', roofConfig: 'Dachaufbau', levelIds: 'Geschosskennungen',
   stairwell: 'Treppenhaus', elevatorShaft: 'Aufzugsschacht', serviceShaft: 'Installationsschacht',
   accessInstances: 'Vertikale Erschließung', roomLayout: 'Raumanordnung', roomConfig: 'Raumaufbau', facade: 'Fassade',
@@ -58,9 +60,13 @@ function Value({ type, value, change, title, path = '', settings = {} }) {
   const choices = settings.choices || context.references?.[path]
   const optional = type.endsWith('?')
   const base = type.replace(/\?$/, '')
-  const pick = options => <label>{title}<select aria-label={title} value={value ?? ''} onChange={event => change(['Int', 'Long'].includes(base) ? Number(event.target.value) : event.target.value)}>
+  const pick = options => <label>{title}<select aria-label={title} value={value ?? (base==='RotationSegmentMode'?'OVERLAY':'')} onChange={event => change(['Int', 'Long'].includes(base) ? Number(event.target.value) : event.target.value)}>
     {options.map(option => { const key = typeof option === 'object' ? option.value : option; return <option key={String(key)} value={key}>{typeof option === 'object' ? option.label : choiceLabels[option] || option}</option> })}
   </select></label>
+  if(base === 'RotationSegmentMode') return pick([{value:'OVERLAY',label:'Vier Rotationen überlagern'},{value:'ADJACENT',label:'Rotiert aneinander · 2×2 Blöcke'}].map(option=>({...option})))
+  if(path==='countValue') return <IntegerField label={title} value={value ?? 0} min={-2147483648} max={2147483647} onChange={change}/>
+  if(base==='CopycatMirrorPlane') return <MirrorPlanePicker label={title} value={value || 'X'} onChange={change}/>
+  if(base==='RotationAxis' && context.node?.kind==='SEGMENT_MIRROR') return <MirrorPlanePicker label="Spiegelachse" value={value || 'X'} planes={['X','Y','Z']} onChange={change}/>
   if (context.group && base === 'String' && path.endsWith('.type')) return pick(context.graphTypes)
   if (context.group && base === 'Int' && path.endsWith('.member')) {
     const output = path.startsWith('outputs.')
@@ -124,6 +130,7 @@ function Value({ type, value, change, title, path = '', settings = {} }) {
     return <fieldset className={type === 'P' ? 'coordinate-grid' : undefined} style={type === 'P' ? {'--coordinate-count':fields.length} : undefined}><legend>{title}</legend>{fields.filter(([key]) => !(context.group && key === 'id')).map(([key, field]) =>
       <Value key={key} type={field} path={path ? `${path}.${key}` : key} settings={contract.structures?.[type]?.[key]} value={object[key] ?? models[type].default?.[key]} title={label(key)} change={next => change({ ...object, [key]: next })} />)}</fieldset>
   }
+  if(type==='CopycatMirrorPlane') return <MirrorPlanePicker label={title} value={value || 'X'} onChange={change}/>
   if (models.enums[type]) return pick(models.enums[type])
   if (type === 'Boolean') return <label className="check"><input type="checkbox" checked={value || false} onChange={event => change(event.target.checked)} />{title}</label>
   return <label>{title}<input type={type === 'String' ? 'text' : 'number'} value={value ?? ''} step="1" min={settings.min} max={settings.max} onChange={event => {
@@ -168,7 +175,7 @@ export function NativeFields({ mode, node, edit, document, library, onInspectNod
   const groups = library?.forms?.[draft.form]?.groups || [{ id: 'body', name: 'Body', role: 'surface' }]
   const patch = (path, next) => setDraft(setPath(draft, path, next))
   return <Context.Provider value={context}><details open className="native-fields"><summary>{mode === 'building' ? 'Knoteneinstellungen' : 'Ausrichtung und Formeinstellungen'}</summary>
-    {node.kind === 'ROTATION_SEGMENT' && <p className="hint">Die Copycat wird bei 0°, 90°, 180° und 270° um Y vereinigt. Die Länge wiederholt dieses Profil entlang Y zur Säule.</p>}
+    {node.kind === 'ROTATION_SEGMENT' && <p className="hint">{draft.columnMode==='ADJACENT'?'Vier um Y gedrehte Copycats bilden eine Lage mit 2×2 Blöcken. Die Länge bestimmt die Anzahl der Lagen.':'Die Copycat wird bei 0°, 90°, 180° und 270° um Y vereinigt. Die Länge wiederholt dieses Profil entlang Y zur Säule.'}</p>}
     {(draft.kind === 'ROOF' && !draft.assembly && draft.roofType === 'gable' || draft.kind === 'ROOF_LEVEL' && ['GABLE', 'CROSS', 'PENT'].includes(draft.roofLevel?.form)) && <p className="hint">Die Dachverlängerung wächst entlang des Firsts über die Giebelseiten hinaus. Dachbreite und Mauern bleiben am Gebäudegrundriss.</p>}
     {fields.map(field => <div key={field.path} data-inspector-field={field.path}>
       {context.derived?.[field.path] ? <div><label>{label(field.path)}<output>{Array.isArray(getPath(context.resolved, field.path)) ? `${getPath(context.resolved, field.path).length} Einträge` : String(getPath(context.resolved, field.path))}</output></label><button type="button" onClick={() => onInspectNode?.(context.derived[field.path])}>Quelle bearbeiten</button></div>

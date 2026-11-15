@@ -19,7 +19,7 @@ for(const name of ['src','examples','docs','build','LICENSE']) {
 }
 for(const name of ['src','test','kotlin','public','tools']) rmSync(join(web,name),{recursive:true,force:true})
 cpSync(adapter,web,{recursive:true,filter:path=>!['node_modules','dist','.tools','generated'].includes(path.split('/').at(-1))})
-run('./gradlew',['test','--tests','*GraphstudioExchangeTest.nativeCorpus','--tests','*CopycatTransformContractTest','--tests','*CopycatParameterPreviewTest','--offline','--rerun'],source)
+run('./gradlew',['test','--tests','*GraphstudioExchangeTest.nativeCorpus','--tests','*CopycatTransformContractTest','--tests','*CopycatParameterPreviewTest','--tests','*GraphstudioValueRegressionTest','--offline','--rerun'],source)
 const coreChecks=report(source)
 // Honour dependency/lock changes even when reusing the development overlay.
 run('npm',['ci','--no-audit','--no-fund'],web)
@@ -38,7 +38,7 @@ const native={core:coreChecks,browserExports:report(source)}
 if(paths.local) {
  const exchange=join(source,'build/graphstudio-exchange')
  const old=process.env.GRAPHSTUDIO_EXCHANGE;process.env.GRAPHSTUDIO_EXCHANGE=exchange
- run('./gradlew',['test','--tests','*GraphstudioExchangeBridgeTest','--tests','*CopycatTransformContractTest','--tests','*CopycatParameterPreviewTest','--offline','--rerun'],paths.local)
+ run('./gradlew',['test','--tests','*GraphstudioExchangeBridgeTest','--tests','*CopycatTransformContractTest','--tests','*CopycatParameterPreviewTest','--tests','*GraphstudioValueRegressionTest','--offline','--rerun'],paths.local)
  process.env.GRAPHSTUDIO_EXCHANGE=old
  report(paths.local)
  run('node',['tools/local-exchange.mjs',exchange],web)

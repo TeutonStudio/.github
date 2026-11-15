@@ -56,10 +56,10 @@ Modstände. Fehlende oder übersprungene Pflichtfälle brechen den Lauf ab.
 Änderungen am Fachkern oder Adapter während der Prüfung brechen den Build ab.
 Vorschau: `http://127.0.0.1:4318/`. Sie bindet nur an Loopback.
 
-Transformationen benötigen Formgraphschema 4 bzw. Gebäudegraphschema 5.
+Transformationen benötigen Formgraphschema 4 bzw. Gebäudegraphschema 5; Vektorrechnung und der aneinanderliegende Säulenmodus benötigen Schema 5 bzw. 6.
 `sources.lock.json` pinnt den veröffentlichten Fachkerncommit
-[`10a3693`](https://github.com/TeutonStudio/Copycat-Architecture/commit/10a369358e821abea048d432d42aa35b2dc4373c)
-auf Basis 0.6.4, Branch `codex/graphstudio-core-064`. Der neuere Mod-Hauptzweig
+[`79f5157`](https://github.com/TeutonStudio/Copycat-Architecture/commit/79f51576ee349a8b519299a1689cfae45661d4a7)
+auf Basis 0.6.4, Branch `codex/graphstudio-values-and-references`. Der neuere Mod-Hauptzweig
 und vorhandene Release-JARs werden dadurch nicht ersetzt. Der öffentliche Build
 prüft weiterhin saubere, gepinnte Quellen und den Mindestvertrag in
 `adapters/copycat/core-contract.json`.

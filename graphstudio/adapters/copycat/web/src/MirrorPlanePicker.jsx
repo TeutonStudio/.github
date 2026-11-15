@@ -1,0 +1,5 @@
+import { mirrorNormals,mirrorPolygon,projectMirrorPoint } from './mirror-planes.js'
+export function MirrorPlanePicker({value='X',onChange,label='Spiegelebene',planes=Object.keys(mirrorNormals)}) {
+  const vertices=Array.from({length:8},(_,i)=>[i&1?1:-1,i&2?1:-1,i&4?1:-1]), edges=vertices.flatMap((p,i)=>vertices.flatMap((q,j)=>j>i && p.filter((v,k)=>v!==q[k]).length===1?[[p,q]]:[]))
+  return <fieldset className="mirror-picker"><legend>{label}</legend><div className="mirror-choices" role="radiogroup" aria-label={label}>{planes.map(plane=><button key={plane} type="button" role="radio" aria-checked={value===plane} aria-label={`${label} ${plane}`} title={`Spiegelebene · Normale (${mirrorNormals[plane].join(', ')})`} onClick={()=>onChange(plane)}><svg viewBox="0 0 64 60" aria-hidden="true">{edges.map(([p,q],i)=><path key={i} d={`M${projectMirrorPoint(p).join(',')}L${projectMirrorPoint(q).join(',')}`} fill="none" stroke="#8b9298" strokeWidth="1"/>)}<polygon points={mirrorPolygon(plane).map(p=>p.join(',')).join(' ')} fill="#b19ce888" stroke="#dfceff" strokeWidth="1.5"/></svg></button>)}</div></fieldset>
+}

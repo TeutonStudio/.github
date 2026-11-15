@@ -15,6 +15,7 @@ export function dependencies(workspace, entry) {
     if (owner.id === entry.id) continue
     const label = owner.name || owner.document?.name || 'Aktueller Entwurf'
     for (const ref of owner.references || []) if (keys.has(ref)) matches.push(label)
+    for(const group of owner.document?.graph?.nodeGroups || []) if(group.libraryReference?.documentId===identityOf(entry) && group.libraryReference.version===(entry.version || 1)) matches.push(`${label} · ${group.name}`)
     // A source copied into the owner's library is independent and survives deletion.
     for (const node of owner.document?.graph?.nodes || owner.nodes || []) {
       if (node.libraryReference?.documentId === identityOf(entry) && node.libraryReference.version === (entry.version || 1)) matches.push(`${label} · ${node.id}`)

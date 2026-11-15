@@ -409,7 +409,7 @@ main {display:flex;flex:1;min-height:0;min-width:0;width:100%;max-width:none;mar
 .collection-actions {display:grid;gap:8px}.collection-data p {font-size:12px;color:var(--muted)}
 .copycat-source-row {display:flex;align-items:center;gap:8px;min-width:0}
 .copycat-source-row .copycat-source-button {flex:1;min-width:0;width:auto}
-.copycat-size {flex:0 0 68px!important;margin:0!important;font-size:11px!important;gap:2px!important}
+.copycat-size {flex:0 1 116px!important;margin:0!important;font-size:11px!important;gap:2px!important}
 .compact-stepper {display:flex;min-width:0;height:38px}.compact-stepper input {width:44px;min-width:0;padding:3px;text-align:center;appearance:textfield;-moz-appearance:textfield}
 .compact-stepper input::-webkit-inner-spin-button,.compact-stepper input::-webkit-outer-spin-button {appearance:none;margin:0}
 .compact-stepper > span {display:grid;width:22px;grid-template-rows:1fr 1fr}
@@ -421,7 +421,7 @@ main {display:flex;flex:1;min-height:0;min-width:0;width:100%;max-width:none;mar
 .file-dialog-actions {flex:0 0 auto;max-height:28%;overflow:auto;border-bottom:1px solid var(--line);padding-bottom:6px}
 .file-dialog-actions .toolbar,.file-dialog-actions .personal-library-bar {margin:0 0 6px;gap:5px}
 .file-filters {display:flex;gap:10px;flex:0 0 auto}.file-filters label {display:grid;gap:3px;font-size:12px;min-width:0}.file-filters label:first-child {flex:1}.file-filters input {width:100%;min-width:0}
-.file-grid {flex:1;min-height:0;overflow:hidden}.file-list {min-height:0;max-height:none;height:100%;overflow:auto}.file-list button {overflow-wrap:anywhere}.file-list button[aria-pressed=true] {border-color:var(--mint);background:#3c4945}
+.file-grid {flex:1;min-height:0;overflow:hidden}.file-list {min-height:0;max-height:none;height:100%;overflow:auto}.file-list button {overflow-wrap:anywhere;flex:0 0 auto}.file-list button[aria-pressed=true] {border-color:var(--mint);background:#3c4945}
 .file-preview {height:100%;min-height:0;overflow:hidden}
 .file-status {flex:0 0 42px;font-size:12px;line-height:17px;overflow:auto;margin:0}
 .file-dialog footer {flex:0 0 auto;flex-wrap:wrap;justify-content:flex-end;gap:6px}
@@ -471,3 +471,26 @@ button.danger:hover:not(:disabled),.file-list button.delete-armed {color:#fff;ba
 .preview-hud-right button {width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:10px;padding:4px}
 
 @media(max-width:540px) {.graph-identity select {width:128px;max-width:128px}}
+
+/* Integer values share the full control surface; their label stays inside it. */
+.integer-field, .inspector .integer-field { display:flex; flex-direction:row; align-items:center; gap:5px; min-width:0; background:#505050; border:1px solid #777; border-radius:2px; padding:0 0 0 7px; color:#eee; }
+.integer-field .integer-label { font-size:11px; line-height:1.2; flex:0 1 auto; overflow-wrap:anywhere; }
+.integer-field input { min-width:0; width:3.4em; flex:1 1 2.5em; border:0; background:transparent; padding:4px; text-align:center; box-shadow:none; }
+.integer-buttons { display:grid; grid-template-rows:1fr 1fr; align-self:stretch; flex:0 0 20px; }
+.integer-buttons button { min-height:0; height:auto; padding:0 3px; line-height:1; border:0; border-left:1px solid #777; border-radius:0; }
+.integer-buttons button + button { border-top:1px solid #777; }
+.copycat-source-row { align-items:stretch; margin:8px 0; }
+.copycat-source-row .copycat-source-button { margin:0; }
+.copycat-source-row > .copycat-size { align-self:stretch; margin:0; max-width:132px; flex:0 1 132px; }
+.coordinate-grid > .integer-field { min-height:38px; }
+.coordinate-grid .integer-label { max-width:60%; }
+.mirror-picker { min-width:0; }
+.mirror-choices { display:grid; grid-template-columns:repeat(auto-fit,minmax(48px,1fr)); gap:4px; }
+.mirror-choices button { min-width:0; padding:2px; min-height:48px; }
+.mirror-choices button[aria-checked=true] { border-color:#e9b947; box-shadow:inset 0 0 0 1px #e9b947; }
+.mirror-choices svg { display:block; width:100%; height:48px; }
+.transform-value-row:has(.mirror-picker) { grid-template-columns:minmax(0,1fr) auto auto auto; }
+.graph-heading .graph-identity { flex-wrap:wrap; }
+
+.ports-output .port { justify-content:flex-end; padding-right:14px; border-bottom:1px solid #666; }
+.ports-output .react-flow__handle { right:-6px; top:50%; }

@@ -1,3 +1,4 @@
+import { libraryReferenceEntries,previewReferenceEntry } from './reference-groups.js'
 import baseLibrary from '../../examples/library.json'
 import { JsonEditor } from './JsonEditor.jsx'
 import { referenceDisabled } from './studio-actions.js'
@@ -10,21 +11,20 @@ import { previewCopycatOption } from './copycat-options.js'
 import { readGraph } from './model.js'
 import { validateNodeGroup } from './node-groups.js'
 import { appendVersion, identityOf, dependencies, deleteVersion, validateReferences } from './documents.js'
-export function FileDialog({ mode, onChoose, onReference, currentIdentity, readOnly, actions, onClose }) {
+export function FileDialog({ mode, onChoose, onReference, currentIdentity, readOnly, actions, onClose, referenceOnly=false, library=baseLibrary }) {
   const {data,update,catalog}=useWorkspace()
   const [query,setQuery]=useState(''), [kind,setKind]=useState('all'), [selected,setSelected]=useState(null), [deleting,setDeleting]=useState(false), [error,setError]=useState(''), [editing,setEditing]=useState(false)
-  const entries=useMemo(() => [...data.graphs.map(entry => ({...entry,collection:'graphs',type:entry.mode === 'form' ? 'Form / Formgraph' : 'Gebäudegraph'})),...data.nodeGroups.map(entry => ({...entry,collection:'nodeGroups',type:'Knotengruppe'}))].filter(entry => entry.mode === mode || mode === 'building' && entry.mode === 'form' && entry.collection === 'graphs'),[data,mode])
+  const entries=useMemo(() => [...data.graphs.map(entry => ({...entry,collection:'graphs',type:entry.mode === 'form' ? 'Form / Formgraph' : 'Gebäudegraph'})),...data.nodeGroups.map(entry => ({...entry,collection:'nodeGroups',type:'Knotengruppe'})),...(referenceOnly?libraryReferenceEntries(library):[])].filter(entry => referenceOnly || entry.mode === mode || mode === 'building' && entry.mode === 'form' && entry.collection === 'graphs'),[data,mode,referenceOnly,library])
   const chosen=entries.find(entry => entry.id === selected)
   const [plan,setPlan]=useState(null)
   useEffect(() => {
     setPlan(null);setError('');setDeleting(false)
-    if (chosen?.collection === 'nodeGroups') {setPlan(chosen.preview || null);return}
-    if (!chosen?.document) return
-    const timer=setTimeout(() => {try {setPlan(chosen.mode === 'form' ? previewCopycatOption(chosen) : previewGraph(true,chosen.document,chosen.library || {},''))} catch(e) {setError(`Vorschau: ${e.message}`)}},0)
+    if(!chosen) return
+    const timer=setTimeout(()=>{try {setPlan(previewReferenceEntry(chosen,library))} catch(e) {setError(`Vorschau: ${e.message}`)}},0)
     return () => clearTimeout(timer)
   },[chosen?.id,mode])
   const refs=chosen ? dependencies(data,chosen) : []
-  const entryPayload=chosen && (chosen.collection === 'nodeGroups' ? Object.fromEntries(['name','mode','schema','nodes','wires','groups','materials','library'].filter(key=>chosen[key] !== undefined).map(key=>[key,chosen[key]])) : chosen.document)
+  const entryPayload=chosen && (chosen.collection === 'nodeGroups' ? Object.fromEntries(['name','mode','schema','nodes','wires','groups','materials','library','palette','graphInterface'].filter(key=>chosen[key] !== undefined).map(key=>[key,chosen[key]])) : chosen.document)
   const saveDraft=payload => {
     const {collection,type,...entry}=chosen
     let changed=collection === 'nodeGroups' ? {...entry,...payload,preview:undefined,document:undefined} : {...entry,document:payload}
@@ -32,19 +32,19 @@ export function FileDialog({ mode, onChoose, onReference, currentIdentity, readO
     update(current=>({...current,[collection]:[...current[collection],saved]}))
     setEditing(false);setSelected(saved.id)
   }
-  const disabledReference=referenceDisabled(chosen,currentIdentity,readOnly)
+  const disabledReference=referenceDisabled(chosen,currentIdentity,readOnly,mode)
   const remove=()=>{
     if(!deleting) {setDeleting(true);return}
     try {update(current=>deleteVersion(current,chosen.collection,chosen.id));setSelected(null);setDeleting(false)} catch(e) {setError(e.message)}
   }
-  return <Modal title="Bibliothek" className="file-dialog" onClose={onClose}>
+  return <Modal title={referenceOnly?'Referenz auswählen':'Bibliothek'} className="file-dialog" onClose={onClose}>
     <div className="file-dialog-actions">{actions}</div>
-    <div className="file-filters"><label>Suchen<input autoFocus data-autofocus type="search" value={query} onChange={e=>{setQuery(e.target.value);setSelected(null)}} /></label><label>Typ<select value={kind} onChange={e=>{setKind(e.target.value);setSelected(null)}}><option value="all">Alle</option><option value="graphs">Graphen / Formen</option><option value="nodeGroups">Knotengruppen</option></select></label></div>
-    <div className="file-grid"><div className="file-list">{entries.filter(entry=>(kind === 'all' || entry.collection === kind) && entry.name.toLocaleLowerCase('de').includes(query.toLocaleLowerCase('de'))).sort((a,b)=>a.name.localeCompare(b.name,'de') || (b.version || 1)-(a.version || 1)).map(entry=><button className={deleting && selected === entry.id ? 'delete-armed' : ''} key={entry.id} aria-pressed={selected === entry.id} onClick={()=>setSelected(entry.id)} onDoubleClick={()=>onChoose(entry)}><strong>{entry.name}</strong><small>{entry.type} · Browser · v{entry.version || 1}</small><small>{entry.documentId || entry.id}</small></button>)}{!entries.length && <p>Noch keine gespeicherten Einträge.</p>}</div>
-      <div className="file-preview"><Viewer plan={plan} catalog={catalog} blockFrame={chosen?.mode === 'form'} />{!plan && <p>{chosen?.document && chosen?.collection !== 'nodeGroups' ? 'Vorschau wird geladen oder ist ungültig.' : 'Für diesen Eintrag ist keine Vorschau gespeichert.'}</p>}</div></div>
-    <p className={`file-status ${error || deleting ? 'error' : 'hint'}`} role="status" title={refs.join(', ')}>{error || (deleting ? refs.length ? `Löschen gesperrt: ${refs.join(', ')}` : 'Rot markierten Eintrag wirklich löschen? Erneut auf „Jetzt löschen“ klicken. Auswahlwechsel bricht ab.' : disabledReference || 'Gespeicherte Version öffnen oder als Copycat-Referenz in den Entwurf einfügen.')}</p>
+    <div className="file-filters"><label>Suchen<input autoFocus data-autofocus type="search" value={query} onChange={e=>{setQuery(e.target.value);setSelected(null)}} /></label><label>Typ<select value={kind} onChange={e=>{setKind(e.target.value);setSelected(null)}}><option value="all">Alle</option><option value="graphs">Graphen / Formen</option><option value="nodeGroups">Knotengruppen</option>{referenceOnly && <><option value="libraryForms">Bibliotheksformen</option><option value="libraryModules">Bibliothekssegmente</option></>}</select></label></div>
+    <div className="file-grid"><div className="file-list">{entries.filter(entry=>(kind === 'all' || entry.collection === kind) && entry.name.toLocaleLowerCase('de').includes(query.toLocaleLowerCase('de'))).sort((a,b)=>a.name.localeCompare(b.name,'de') || (b.version || 1)-(a.version || 1)).map(entry=><button className={deleting && selected === entry.id ? 'delete-armed' : ''} key={entry.id} aria-pressed={selected === entry.id} onClick={()=>setSelected(entry.id)} onDoubleClick={()=>{if(!referenceOnly || !referenceDisabled(entry,currentIdentity,readOnly,mode)) (referenceOnly?onReference:onChoose)(entry)}}><strong>{entry.name}</strong><small>{entry.type} · {entry.collection.startsWith('library')?'Bibliothek':'Browser'} · v{entry.version || 1}</small><small>{entry.documentId || entry.id}</small></button>)}{!entries.length && <p>Noch keine gespeicherten Einträge.</p>}</div>
+      <div className="file-preview">{plan?.value && <p className="reference-value" role="status">{plan.value}</p>}<Viewer plan={plan} catalog={catalog} blockFrame={chosen?.mode === 'form'} />{!plan && <p>{chosen?.document && chosen?.collection !== 'nodeGroups' ? 'Vorschau wird geladen oder ist ungültig.' : 'Für diesen Eintrag ist keine Vorschau gespeichert.'}</p>}</div></div>
+    <p className={`file-status ${error || deleting ? 'error' : 'hint'}`} role="status" title={refs.join(', ')}>{error || (deleting ? refs.length ? `Löschen gesperrt: ${refs.join(', ')}` : 'Rot markierten Eintrag wirklich löschen? Erneut auf „Jetzt löschen“ klicken. Auswahlwechsel bricht ab.' : disabledReference || 'Gespeicherte Version öffnen oder als typisierte Referenz einfügen.')}</p>
     {editing && chosen && <JsonDialog mode={chosen.mode} document={entryPayload} library={chosen.library || baseLibrary} parse={chosen.collection === 'nodeGroups' ? value=>{if(value.mode!==chosen.mode) throw new Error('Die Knotengruppe gehört zum anderen Editor.');return validateNodeGroup(value)} : undefined} saveLabel="Neue Version speichern" onApply={saveDraft} onClose={()=>setEditing(false)} />}
-    <footer><button onClick={onClose}>Schließen</button><button disabled={!chosen} onClick={()=>setEditing(true)}>JSON bearbeiten …</button><button className="danger" disabled={!chosen || Boolean(deleting && refs.length)} onClick={remove}>{deleting ? 'Jetzt löschen' : 'Löschen'}</button><button disabled={Boolean(disabledReference)} title={disabledReference || 'Genaue Version als Copycat-Knoten einfügen'} onClick={()=>onReference(chosen)}>Als Referenz einfügen</button><button className="primary" disabled={!chosen || readOnly && chosen?.collection === 'nodeGroups'} onClick={()=>onChoose(chosen)}>Öffnen / Einfügen</button></footer>
+    <footer><button onClick={onClose}>Schließen</button><button disabled={!chosen || !['graphs','nodeGroups'].includes(chosen.collection)} onClick={()=>setEditing(true)}>JSON bearbeiten …</button><button className="danger" disabled={!chosen || !['graphs','nodeGroups'].includes(chosen.collection) || Boolean(deleting && refs.length)} onClick={remove}>{deleting ? 'Jetzt löschen' : 'Löschen'}</button><button disabled={Boolean(disabledReference)} title={disabledReference || 'Genaue Version als typisierten Referenzknoten einfügen'} onClick={()=>onReference(chosen)}>Als Referenz einfügen</button>{!referenceOnly && <button className="primary" disabled={!chosen || readOnly && chosen?.collection === 'nodeGroups'} onClick={()=>onChoose(chosen)}>Öffnen / Einfügen</button>}</footer>
   </Modal>
 }
 export function JsonDialog({ mode, document, library, onApply, onClose, parse, saveLabel='Übernehmen' }) {

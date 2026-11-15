@@ -210,3 +210,15 @@ CC-Visual-Korpus und maschinenlesbaren Knotenvertrag aus dem lokalen Mod ableite
 danach die Domänenbefehle für Umverdrahten/Löschen mit stabilen Port-IDs isolieren.
 Diese erste Extraktion soll durch die vorhandenen Graph-/Projekt-/Lua-Tests und
 den opt-in nativen Test `devtests/kilagraph-ui.gradle` abgesichert werden.
+
+## Editor-Korrekturen: Werte, Referenzen und Säulen
+
+Der Organisationseditor bietet kompakte Ganzzahlfelder mit Schrittreglern, grafische Spiegelebenen und eine direkte Aktion „Als vX speichern“. Gespeicherte Versionen bleiben unveränderlich; das Verschieben von Knoten ändert dort nur die Ansicht.
+
+Positionen lassen sich aus drei Anzahl-Eingängen zusammensetzen und als gemeinsamer Knoten mit drei Ausgängen zerlegen. Addition, Subtraktion, Multiplikation, ganzzahlige Division, Minimum und Maximum verwenden denselben JVM-/Browser-Auswerter. Neue hB-Koordinaten sind nichtnegativ; Überlauf, Division durch null und Grenzüberschreitungen erzeugen Diagnosen. Ältere lokale Rotationen und ältere optionale Anschlüsse bleiben lesbar.
+
+Die Referenzauswahl im Gebäudegraphen enthält Formen, gespeicherte Graphen, Knotengruppen und Bibliothekssegmente. Ein Referenzknoten behält seine genaue Version, Materialien und typisierten Anschlüsse. Eigene Versionen sind gesperrt. Knotengruppen erhalten ihre benannten Ein- und Ausgänge einschließlich Mehrfachbindungen. Ganze Gebäude und Bibliothekssegmente besitzen entsprechend Gebäude- beziehungsweise Segmentausgänge.
+
+Rotationssegmente unterstützen die bisherigen vier überlagerten Y-Drehungen sowie vier aneinanderliegende, gedrehte Blöcke auf einer Fläche von 2×2 Blöcken. Die Länge bestimmt die Zahl der Lagen. Der native Materialauswerter berechnet beide Varianten.
+
+Vektorrechnung und der neue Säulenmodus benötigen Formgraphschema 5 beziehungsweise Gebäudegraphschema 6. Transformationsfunktionen ohne diese Erweiterungen behalten die bisher erforderlichen Schemas 4/5. Der öffentliche Quellen-Pin wird erst nach Veröffentlichung und Prüfung des gemeinsamen Fachkerns aktualisiert.
