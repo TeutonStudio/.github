@@ -1,0 +1,58 @@
+name: Organisations-Graphstudio
+
+on:
+  push:
+    branches: [main]
+    paths: ['graphstudio/**', 'docs/GRAPHSTUDIO.md', '.github/workflows/graphstudio.yml']
+  pull_request:
+    paths: ['graphstudio/**', 'docs/GRAPHSTUDIO.md', '.github/workflows/graphstudio.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: graphstudio-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - name: Test build and channel isolation
+        run: npm test
+        working-directory: graphstudio
+      - name: Build pinned public adapter and verify JVM → browser → JVM
+        run: npm run build
+        working-directory: graphstudio
+      - uses: actions/upload-artifact@v4
+        with:
+          name: graphstudio-review
+          path: graphstudio/dist
+      - uses: actions/upload-pages-artifact@v4
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        with:
+          path: graphstudio/dist
+
+  deploy:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

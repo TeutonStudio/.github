@@ -1,0 +1,8 @@
+graphstudio/.cache/
+graphstudio/.internal-dist/
+graphstudio/dist/
+graphstudio/adapters/copycat/web/node_modules/
+graphstudio/adapters/copycat/web/dist/
+graphstudio/adapters/copycat/web/src/generated/
+graphstudio/adapters/copycat/web/.tools/
+graphstudio/adapters/copycat/web/public/compatibility.json

@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="de">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Graphstudio · TeutonStudio</title>
+<link rel="stylesheet" href="./studio.css">
+<script type="module" src="./studio.mjs"></script>
+<body>
+  <header><a class="wordmark" href="https://github.com/TeutonStudio">TEUTONSTUDIO</a><span class="channel" id="channel">Stand wird geladen</span></header>
+  <main>
+    <div class="intro"><p class="eyebrow">ENTWICKELN · PRÜFEN · IM SPIEL VERWENDEN</p><h1>Graphstudio</h1><p>Ein Arbeitsplatz für die Graphen unserer Mods.<br>Jeder Editor nennt seinen Quellstand und seine Prüfergebnisse.</p></div>
+    <p id="channel-info" class="notice" role="status">Prüfmanifest wird geladen …</p>
+    <section aria-labelledby="editors"><div class="section-heading"><h2 id="editors">Editoren &amp; Teststände</h2><span id="built"></span></div><div id="adapters" class="adapters"></div></section>
+    <section class="plan" aria-labelledby="roadmap"><p class="eyebrow">ERSTE FASSUNG · UMBAUPLAN</p><h2 id="roadmap">CC Visual für komplexe Graphen erweitern</h2><p>Die gemeinsame Oberfläche verbindet Auswahl, Verkabelung, Navigation und Diagnosen. Lua-Abläufe, Formberechnung und Gebäudeplanung behalten ihre eigenen Typen und Validatoren.</p>
+      <ol><li><strong>Verträge und Vergleichsfälle festhalten.</strong> Schemata, Pins, Gruppen und erwartete Ergebnisse pro Mod versionieren.</li><li><strong>Graphbefehle vereinheitlichen.</strong> Änderungen als atomare Operationen mit stabilen Knoten- und Port-IDs; Undo erhält Gruppenbindungen und Quellbezüge.</li><li><strong>Hierarchie und Vorschauen ausbauen.</strong> Gruppeninstanzen, benannte Ein-/Ausgänge, Breadcrumbs und bedarfsgerechte Vorschauen.</li><li><strong>Größe messen und gezielt optimieren.</strong> Indizes, Teilaktualisierungen und sichtbare Ausschnitte gegen echte große Testgraphen prüfen.</li><li><strong>Browser ↔ Mod abnehmen.</strong> Import, Bearbeitung, Export und tatsächliche Modauswertung; danach Prüfung im Minecraft-Client.</li></ol>
+      <p><a href="./plan.md">Vollständiger Plan mit Abnahmekriterien</a> · <a href="./studio.json">Prüfmanifest</a></p>
+    </section>
+    <section class="migration"><h2>Vor dem Umzug: Bibliothek sichern</h2><p>Im bisherigen Copycat-Graphstudio eine Graphstudio-Sicherung exportieren und im neuen Editor importieren. Die alte Website bleibt während der Umstellung erreichbar. Ein Wechsel der Website-Adresse kann den Browserspeicher verändern.</p><a href="https://teutonstudio.github.io/Copycat-Architecture/">Bisheriges Copycat-Graphstudio öffnen ↗</a></section>
+  </main><footer>Graphstudio · Ein Testergebnis gilt für den angegebenen Quellstand und den ausgewiesenen Prüfumfang.</footer>
+</body></html>
