@@ -40,7 +40,7 @@ try {
     card.append(checks)
     if (adapter.note) card.append(element('p', adapter.note, 'note'))
     if (adapter.url && adapter.status !== 'failed') {
-      if (adapter.id === 'copycat') { link('Formgraph öffnen →', `${adapter.url}?editor=form`, card); link('Gebäudegraph öffnen →', `${adapter.url}?graph=building`, card) }
+      if (adapter.id === 'copycat') { link('Graph öffnen →', `${adapter.url}?editor=graph`, card) }
       else link('Editor öffnen →', adapter.url, card)
     } else card.append(element('p', adapter.status === 'failed' ? 'Details im lokalen Testlauf prüfen.' : 'Umsetzung im Plan beschrieben.', 'note'))
     document.getElementById('adapters').append(card)

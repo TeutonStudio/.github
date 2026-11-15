@@ -396,7 +396,7 @@ export default function Preview({ mode, document, library, selected, previewMode
   const [result, setResult] = useState({})
   const target = previewMode === 'selected' ? selected : ''
   const missingSelection = previewMode === 'selected' && !selected
-  const blockFrame = mode === 'form' || (previewMode === 'selected' && document.graph.nodes.find(node => node.id === selected)?.kind?.startsWith('COPYCAT'))
+  const blockFrame = mode === 'form' || document.graph.nodes.some(node=>node.resultType==='COPYCAT') && previewMode==='graph' || (previewMode === 'selected' && document.graph.nodes.find(node => node.id === selected)?.kind?.startsWith('COPYCAT'))
   const latest = useRef(document)
   latest.current = document
   useEffect(() => { setResult({}) }, [mode, target, previewMode])

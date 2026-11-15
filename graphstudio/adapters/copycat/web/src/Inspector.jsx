@@ -1,3 +1,4 @@
+import { cardTypeLabel } from './card-types.js'
 import { IntegerField } from './IntegerField.jsx'
 import { MirrorPlanePicker } from './MirrorPlanePicker.jsx'
 import { useState } from 'react'
@@ -39,6 +40,7 @@ export const names = { REFERENCE:'Referenz',VECTOR_SPLIT:'Position zerlegen',
 
 export function portName(port, node) {
   const native = { length: 'Länge (Y)', roofPeak: 'Dachspitze (optional)', roofEave: 'Dachendkante / Traufe (optional)', layout: 'Anordnung', geometry: 'Grundriss', area: 'Fläche', tread: 'Stufen', landing: 'Podest', enclosure: 'Schachtwände' }
+  if(node.kind==='AREA' && ['length','height'].includes(port.id)) return `${node.areaMode==='SQUARE'?'Seitenlänge':port.id==='length'?'Breite X':'Länge Z'} · Anzahl`
   if (native[port.id]) return native[port.id]
   if (port.id.startsWith('region:')) return `Bereich ${port.id.slice(7)}`
   if (port.id.startsWith('semantic:')) {
@@ -55,7 +57,12 @@ export function portName(port, node) {
   const [kind, key] = port.id.split(':')
   if (node.kind === 'SEGMENT_DIFFERENCE' && kind === 'in') return key === '0' ? 'A · Grundsegment' : 'B · Abzug'
   if (node.kind === 'COPYCAT_DIFFERENCE' && kind === 'in') return key === '0' ? 'A · Grundform' : 'B · Abzug'
+  if(kind==='in' && node.kind.startsWith('POSITION_') && !/^POSITION_[XYZ]$/.test(node.kind)) return `Position ${Number(key)+1}`
+  if(kind==='in' && node.kind.startsWith('INT_')) return `Anzahl ${Number(key)+1}`
+  if(kind==='in' && node.resultType) return `Ergebnis · ${cardTypeLabel(node.resultType)}`
   if (kind === 'in') {
+    if(node.kind==='SEGMENT' && node.dynamicAxes?.length) return 'Inneres · Copycat'
+    if(node.kind==='ROOF' && node.adaptiveRoof) return ['Fläche','Spitze / First','Ecke innen','Ecke außen','Wandsegment'][Number(key)]
     if (node.kind === 'ROOF' && node.assembly && Number(key) < 6) return ['Dachfläche', 'Dachendkante / Traufe', 'Ortgang', 'First', 'Grat', 'Kehle'][Number(key)]
     const family = node.kind === 'BUILDING' ? 'Außenanlage' : node.kind === 'ROOF_LAYOUT' ? 'Dachebene' : node.kind === 'ROOM_LAYOUT' || node.kind === 'PATTERN' || node.kind.startsWith('SEGMENT_') ? 'Segment' : node.kind === 'STOREY' ? 'Raum' : 'Copycat'
     return `${family} ${Number(key) + 1}`
@@ -117,8 +124,8 @@ export function NodeFields({ mode, node, document, edit, library, onChooseCopyca
     <Field key={key} label={label} value={node[key]} onChange={value => edit({ [key]: value })} {...{ options, type, min, max }} />
   const number = (key, label, min, max) => field(key, label, undefined, 'number', min, max)
   const groups = formGroups(document)
-  const source = model.shapes.find(shape => shape.id === node.part?.source)
-  const sourceName = node.kind === 'INPUT' ? copycatShapeNames[source?.name] || source?.name
+  const source = model.shapes.find(shape => shape.id === (node.inlinePart || node.part)?.source)
+  const sourceName = node.inlinePart ? copycatShapeNames[source?.name] || source?.name : node.kind === 'INPUT' ? copycatShapeNames[source?.name] || source?.name
     : node.kind === 'SAVED' ? node.savedCopycat?.name : library.forms?.[node.form]?.name || node.form
   const copycatPicker = <button type="button" className="copycat-source-button" aria-label={mode==='building'?'Referenz auswählen':'Copycat auswählen'} onClick={onChooseCopycat}>
     <span>{mode==='building'?'Referenz auswählen …':'Copycat auswählen …'}</span><small>{sourceName || 'Grundform oder gespeicherte Form'}</small>
@@ -155,10 +162,11 @@ export function NodeFields({ mode, node, document, edit, library, onChooseCopyca
     </>
   }
 
+  if(node.resultType) return <label>Ausgabetyp der Karte<select aria-label="Ausgabetyp der Karte" value={node.resultType} onChange={e=>edit({resultType:e.target.value,inputs:['']})}>{model.cardTypes.map(type=><option key={type} value={type}>{cardTypeLabel(type)}</option>)}</select></label>
   if (node.id === 'empty_wall') return <p className="hint">Standardquelle für eine freie Wandöffnung.</p>
   return <>
     {field('name', 'Knotenname')}
-    {node.kind === 'COPYCAT' && <>{copycatPicker}<button type="button" onClick={onImportCopycat}>Formdatei laden</button></>}
+    {node.kind === 'COPYCAT' && <><div className="copycat-source-row">{copycatPicker}{node.inlinePart && (model.shapes.find(s=>s.id===node.inlinePart.source)?.max || 1)>1 && <IntegerField className="copycat-size" label="Größe" value={node.inlinePart.size || 1} min={1} max={model.shapes.find(s=>s.id===node.inlinePart.source).max} onChange={size=>edit({inlinePart:{...node.inlinePart,size}})}/>}</div><button type="button" onClick={onImportCopycat}>Formdatei laden</button></>}
     <NativeFields {...{ mode, node, edit, document, library, onInspectNode }} />
     {['ROOM', 'STOREY', 'BUILDING'].includes(node.kind) && field('preview', 'Vorschaufilter', viewFilters)}
     {['COPYCAT_DIFFERENCE', 'SEGMENT_DIFFERENCE'].includes(node.kind) && <button type="button" onClick={() => edit({ inputs: [...node.inputs].reverse() })}>A / B tauschen</button>}

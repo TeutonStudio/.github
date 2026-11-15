@@ -49,7 +49,7 @@ fun exportDocument(isBuilding:Boolean,document:dynamic):Json = if(isBuilding) {
 
 @JsExport
 fun graphModels(): Json = json(
-    "release" to graphRelease,"catalogSha256" to graphCatalogHash,
+    "cardTypes" to GraphCards.types.toTypedArray(),"release" to graphRelease,"catalogSha256" to graphCatalogHash,
     "copycatSchemas" to GraphModels.copycat.graphSchemas.toTypedArray(),
     "buildingSchemas" to GraphModels.building.graphSchemas.toTypedArray(),
     "form" to browserFormKinds.map { kind -> json("kind" to kind.name,
@@ -71,7 +71,7 @@ fun graphModels(): Json = json(
     "positionMin" to GraphModels.coordinates.first, "positionMax" to GraphModels.coordinates.last
 )
 
-private fun inspectBuilding(n:BuildingNode,graph:BuildingGraph):Json=json("node" to n.jsNode(),"outputType" to buildingGraphType(n.kind),
+private fun inspectBuilding(n:BuildingNode,graph:BuildingGraph):Json=json("dynamicAxes" to DynamicSegments.axes(graph,n.id).map { it.name }.toTypedArray(),"node" to n.jsNode(),"outputType" to (n.resultType ?: buildingGraphType(n.kind)),
     "ports" to BuildingPorts.of(n,graph,true).map { port -> json("id" to port.key,"source" to port.source,"accepts" to port.accepts.map { it.name }.toTypedArray(),
         "types" to port.accepts.map(::buildingGraphType).distinct().toTypedArray(),"length" to port.length,"height" to port.height) }.toTypedArray())
 private fun inspectShape(value:GraphNode):Json { val n=value.withValueSockets();return json("node" to value.jsNode(),"outputType" to GraphModels.shape(n.kind).output,
@@ -239,7 +239,9 @@ fun previewGraph(isBuilding: Boolean, document: dynamic, library: dynamic, selec
     val forms = map(library.forms) { obj, key -> form(obj[key]) }
     val modules = map(library.modules) { obj, key -> module(obj[key]) }
     val graph = requireNotNull(b.graph)
-    val selectedNode=graph.nodes.firstOrNull { it.id==selected }
+    val result=graph.resultNode()
+    val cardTarget=if((selected.isEmpty() || selected==result.id) && result.resultType!=null) result.inputs.firstOrNull().orEmpty().also { require(it.isNotEmpty()) { "Connect the graph result" } } else selected
+    val selectedNode=graph.nodes.firstOrNull { it.id==cardTarget }
     if(selectedNode?.kind?.name in GraphValues.kinds) {
         BuildingGraphCompiler.structure(graph)
         return json("count" to 0,"raw" to 0,"meshes" to emptyArray<Json>(),"value" to if(selectedNode!!.kind.name in GraphValues.integerKinds) "Anzahl: ${GraphValues.building(graph.nodes.associateBy { it.id }).integer(selectedNode.id)}" else "Position: ${GraphValues.building(graph.nodes.associateBy { it.id }).vector(selectedNode.id)} hB")
@@ -249,9 +251,9 @@ fun previewGraph(isBuilding: Boolean, document: dynamic, library: dynamic, selec
         val value=if(selectedNode!!.kind==BuildingKind.POSITION) "Versatz: ${selectedNode.translation}" else if(selectedNode.kind==BuildingKind.ROTATION) selectedNode.rotations.orEmpty().joinToString(" → ") { "${it.axis}: ${it.quarterTurns*90}°" } else selectedNode.mirrors.orEmpty().joinToString(" → ") { it.plane.name }
         return json("count" to 0,"raw" to 0,"meshes" to emptyArray<Json>(),"value" to value.ifEmpty { "Identität (leere Liste)" })
     }
-    val plan = if(selected.isEmpty()) BuildingGraphCompiler.compile(b,forms,modules).plan
+    val plan = if(cardTarget.isEmpty()) BuildingGraphCompiler.compile(b,forms,modules).plan
         else BuildingGraphCompiler.Evaluation(graph,b.palette,forms,modules).let { evaluation ->
-            if(graph.nodes.first { it.id==selected }.kind in setOf(BuildingKind.FLOOR,BuildingKind.CEILING)) evaluation.contextualPlatePreview(selected) else evaluation.preview(selected)
+            if(graph.nodes.first { it.id==cardTarget }.kind in setOf(BuildingKind.FLOOR,BuildingKind.CEILING)) evaluation.contextualPlatePreview(cardTarget) else evaluation.preview(cardTarget)
         }
     val filter = graph.nodes.firstOrNull { it.id == selected }?.preview
         ?: graph.resultNode().preview
@@ -400,7 +402,8 @@ fun inspectorContext(document:dynamic,id:String):Json {
     fun source(id:String,vararg fields:String) { if(id.isNotEmpty()) fields.forEach { derived[it]=id } }
     when(node.kind) {
         BuildingKind.ROTATION_SEGMENT->source(node.dimensions.orEmpty()["length"].orEmpty(),"length")
-        BuildingKind.SEGMENT->source(node.layout,"length","height","depth")
+        BuildingKind.AREA->{source(node.dimensions.orEmpty()["length"].orEmpty(),"length");source(node.dimensions.orEmpty()["height"].orEmpty(),"height")}
+        BuildingKind.SEGMENT->if(node.dynamicAxes.isNullOrEmpty()) source(node.layout,"length","height","depth")
         BuildingKind.SEGMENT_LAYOUT->source(node.geometry,"length","height")
         BuildingKind.ROOM_GEOMETRY->source(node.geometry,"coordinates")
         BuildingKind.ROOM->if(node.assembly) source(node.geometry,"height","rectangles")
@@ -501,4 +504,27 @@ fun transformDiagnostics(isBuilding:Boolean,document:dynamic,library:dynamic):Ar
     graph.nodes.filter { !it.copycatTransforms.isNullOrEmpty() || it.kind in BuildingCopycatTransforms.operatorKinds }.mapNotNull { n ->
         runCatching { evaluation.preview(n.id) }.exceptionOrNull()?.let { json("nodeId" to n.id,"message" to (it.message ?: "Invalid Copycat transformation")) }
     }.toTypedArray()
+}
+
+/** Area preview uses the same resolved cells as every geometry consumer. */
+@JsExport
+fun areaGraph(document:dynamic,id:String):Json {
+    val graph=buildingGraph(document.graph);val node=graph.nodes.first { it.id==id && it.kind==BuildingKind.AREA }
+    val resolved=BuildingCounts.resolve(graph,node,true);val area=graph.areaOf(resolved)
+    return json("points" to area?.points.orEmpty().map { it.jsPoint() }.toTypedArray(),"width" to (area?.width ?: 0),"length" to (area?.length ?: 0))
+}
+
+@JsExport
+fun starterCard():Json=encodeBuilding(Building(schema=2,name="Neuer Graph",graph=GraphCards.starter()))
+
+@JsExport
+fun cardForm(document:dynamic,library:dynamic):Json {
+    val b=building(document);val graph=requireNotNull(b.graph);val result=graph.resultNode()
+    require(result.resultType=="COPYCAT") { "Select a Copycat card" }
+    val forms=map(library.forms) { obj,key->form(obj[key]) };val modules=map(library.modules) { obj,key->module(obj[key]) }
+    val plan=BuildingGraphCompiler.Evaluation(graph,b.palette,forms,modules).preview(result.id)
+    require(plan.placements.size<=1) { "A Copycat card must fit one block" }
+    val placement=plan.placements.firstOrNull()
+    val value=Geometry.validate(Form(name=b.name,parts=placement?.parts.orEmpty(),groups=placement?.groups ?: DEFAULT_GROUPS))
+    return json("form" to encodeForm(value),"materials" to placement?.surfaces.orEmpty().asJson())
 }

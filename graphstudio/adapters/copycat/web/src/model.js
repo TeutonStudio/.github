@@ -66,8 +66,8 @@ export function connections(entries) {
     .map(port => ({ source: port.source, target: node.id, port: port.id })))
 }
 
-export function protectedNode(node) {
-  return node.id === 'empty_wall' || ['OUTPUT', 'BUILDING'].includes(node.kind)
+export function protectedNode(node,document) {
+  return node.id === 'empty_wall' || node.resultType!=null || node.kind==='OUTPUT' || node.kind==='BUILDING' && !document?.graph.nodes.some(n=>n.resultType!=null)
 }
 
 export function applyWires(mode, document, entries, wires, removed = []) {
