@@ -1,3 +1,5 @@
+import { AreaControls } from './AreaPreview.jsx'
+import { areaGraph } from './generated/engine.mjs'
 import { IntegerField } from './IntegerField.jsx'
 import { MirrorPlanePicker } from './MirrorPlanePicker.jsx'
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
@@ -12,7 +14,7 @@ import { MaterialField } from './Workspace.jsx'
 const models = wireModels()
 const contextCarpets = model.carpets
 const Context = createContext({})
-const choiceLabels = { OVERLAY:'Vier Rotationen überlagern', ADJACENT:'Rotiert aneinander · 2×2 Blöcke', SEPARATED: 'Separiert', GROUPED: 'Gruppiert', NORMAL: 'Lokale Normale', FOOTPRINT: 'Aus Grundriss', SEGMENTS: 'Aus Segmenten', FLAT: 'Flachdach', PENT: 'Pultdach', GABLE: 'Satteldach', HIP: 'Walmdach', MANSARD: 'Mansarddach', HEIGHT: 'Firsthöhe', ANGLE: 'Dachneigung', rooms: 'Aus Räumen', walls: 'Aus Wänden', horizontal: 'Horizontal', vertical: 'Vertikal', depth: 'Tiefe', transform: 'Frei anordnen', flat: 'Flachdach', gable: 'Satteldach', AUTO: 'Automatisch', EXPLICIT: 'Explizit', OPEN: 'Offen', BOUNDARY: 'Raumgrenze', OPENING: 'Öffnung', STRUCTURE: 'Tragwerk', DECORATION: 'Dekoration' }
+const choiceLabels = { SQUARE:'Quadrat', RECTANGLE:'Rechteck', DRAW:'Anklicken', OVERLAY:'Vier Rotationen überlagern', ADJACENT:'Rotiert aneinander · 2×2 Blöcke', SEPARATED: 'Separiert', GROUPED: 'Gruppiert', NORMAL: 'Lokale Normale', FOOTPRINT: 'Aus Grundriss', SEGMENTS: 'Aus Segmenten', FLAT: 'Flachdach', PENT: 'Pultdach', GABLE: 'Satteldach', HIP: 'Walmdach', MANSARD: 'Mansarddach', HEIGHT: 'Firsthöhe', ANGLE: 'Dachneigung', rooms: 'Aus Räumen', walls: 'Aus Wänden', horizontal: 'Horizontal', vertical: 'Vertikal', depth: 'Tiefe', transform: 'Frei anordnen', flat: 'Flachdach', gable: 'Satteldach', AUTO: 'Automatisch', EXPLICIT: 'Explizit', OPEN: 'Offen', BOUNDARY: 'Raumgrenze', OPENING: 'Öffnung', STRUCTURE: 'Tragwerk', DECORATION: 'Dekoration' }
 const labels = {
   columnMode: 'Säulenaufbau', countValue: 'Anzahl', roofType: 'Dachart', ridge: 'Firstrichtung', overhang: 'Dachüberhang', coordinates: 'Koordinaten', layoutCells: 'Zellenbelegung', assembly: 'Expliziter Aufbau', depth: 'Tiefe',
   regionCopies: 'Copycats je Bereich', roofLevel: 'Dachebene', roofConfig: 'Dachaufbau', levelIds: 'Geschosskennungen',
@@ -64,6 +66,7 @@ function Value({ type, value, change, title, path = '', settings = {} }) {
     {options.map(option => { const key = typeof option === 'object' ? option.value : option; return <option key={String(key)} value={key}>{typeof option === 'object' ? option.label : choiceLabels[option] || option}</option> })}
   </select></label>
   if(base === 'RotationSegmentMode') return pick([{value:'OVERLAY',label:'Vier Rotationen überlagern'},{value:'ADJACENT',label:'Rotiert aneinander · 2×2 Blöcke'}].map(option=>({...option})))
+  if(path==='dynamicAxes') return <fieldset><legend>Dynamische Maße</legend>{[['X','Länge X'],['Y','Höhe Y'],['Z','Tiefe Z']].map(([axis,label])=><label className="check" key={axis}><input type="checkbox" checked={value?.includes(axis) || false} onChange={e=>change(e.target.checked?[...(value || []),axis]:(value || []).filter(item=>item!==axis))}/>{label}</label>)}</fieldset>
   if(path==='countValue') return <IntegerField label={title} value={value ?? 0} min={-2147483648} max={2147483647} onChange={change}/>
   if(base==='CopycatMirrorPlane') return <MirrorPlanePicker label={title} value={value || 'X'} onChange={change}/>
   if(base==='RotationAxis' && context.node?.kind==='SEGMENT_MIRROR') return <MirrorPlanePicker label="Spiegelachse" value={value || 'X'} planes={['X','Y','Z']} onChange={change}/>
@@ -162,7 +165,7 @@ const formWidgets = {
 export function NativeFields({ mode, node, edit, document, library, onInspectNode }) {
   const [draft, setDraft] = useState(() => structuredClone(node))
   useEffect(() => setDraft(structuredClone(node)), [JSON.stringify(node)])
-  const fields = inspectorFields(mode, node).filter(field => !(['INPUT','SAVED','COPYCAT'].includes(node.kind) && ['rotationAxis','quarterTurns','rotationPivot','translation','offset','turn','tilt','spin','top','part.top'].includes(field.path))).filter(field => !['rotationPivot','translation'].includes(field.path)).filter(field => !(mode === 'form' && formWidgets[node.kind]?.includes(field.path)))
+  const fields = inspectorFields(mode, node).filter(field=>!(draft.dynamicAxes?.length && ['module','block'].includes(field.path))).filter(field => !(['INPUT','SAVED','COPYCAT'].includes(node.kind) && ['rotationAxis','quarterTurns','rotationPivot','translation','offset','turn','tilt','spin','top','part.top'].includes(field.path))).filter(field => !['rotationPivot','translation'].includes(field.path)).filter(field => !(mode === 'form' && formWidgets[node.kind]?.includes(field.path)))
   const context = useMemo(() => {
     if (mode !== 'building') return { mode, library, node: draft, slopes: model.roofSlopes }
     try {
@@ -170,11 +173,15 @@ export function NativeFields({ mode, node, edit, document, library, onInspectNod
       return { ...inspectorContext(altered, node.id), mode, library, node: draft, carpets: contextCarpets }
     } catch { return { mode, library, node: draft, references: {}, carpets: [] } }
   }, [mode, document, library, draft])
+  if(node.resultType) return null
+  if(mode==='building' && node.kind==='AREA') {let area;try{area=areaGraph(document,node.id)}catch{};return <section><AreaControls node={node} model={area} edit={edit}/><p className="hint">Die Fläche wird in der 2D-Vorschau bearbeitet. Quadrat: ein Anzahlanschluss; Rechteck: zwei; Anklicken: keine Eingänge.</p></section>}
   if (mode === 'building' && ['ROTATION', 'MIRRORING'].includes(node.kind)) return <TransformValues {...{ node, edit }} />
   if (!fields.length) return null
   const groups = library?.forms?.[draft.form]?.groups || [{ id: 'body', name: 'Body', role: 'surface' }]
   const patch = (path, next) => setDraft(setPath(draft, path, next))
   return <Context.Provider value={context}><details open className="native-fields"><summary>{mode === 'building' ? 'Knoteneinstellungen' : 'Ausrichtung und Formeinstellungen'}</summary>
+    {node.kind==='SEGMENT' && draft.dynamicAxes?.length>0 && <p className="hint">Dynamische Achsen werden erst vom verwendenden Raum oder Dach aufgelöst. Die eingestellten Maße dienen als Vorschau. Ein Copycat-Eingang belegt das gesamte Innere; Flächen-, Kanten- und Eckanschlüsse entfallen.</p>}
+    {node.kind==='ROOF' && node.adaptiveRoof && <p className="hint">Das Dach ermittelt Fläche, First sowie innere und äußere Ecken automatisch. Dynamische Segmente erhalten die benötigten Maße. Ohne Vorlage wird die entsprechende Dachgeometrie erzeugt.</p>}
     {node.kind === 'ROTATION_SEGMENT' && <p className="hint">{draft.columnMode==='ADJACENT'?'Vier um Y gedrehte Copycats bilden eine Lage mit 2×2 Blöcken. Die Länge bestimmt die Anzahl der Lagen.':'Die Copycat wird bei 0°, 90°, 180° und 270° um Y vereinigt. Die Länge wiederholt dieses Profil entlang Y zur Säule.'}</p>}
     {(draft.kind === 'ROOF' && !draft.assembly && draft.roofType === 'gable' || draft.kind === 'ROOF_LEVEL' && ['GABLE', 'CROSS', 'PENT'].includes(draft.roofLevel?.form)) && <p className="hint">Die Dachverlängerung wächst entlang des Firsts über die Giebelseiten hinaus. Dachbreite und Mauern bleiben am Gebäudegrundriss.</p>}
     {fields.map(field => <div key={field.path} data-inspector-field={field.path}>

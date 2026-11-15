@@ -1,3 +1,5 @@
+import { DeleteDialog } from './FileDialog.jsx'
+import { groupVersions } from './version-groups.js'
 import { dependencies, deleteVersion, mergeVersions } from './documents.js'
 import { Modal } from './Modal.jsx'
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
@@ -16,6 +18,7 @@ export function Workspace({ children }) {
   const [data, setData] = useState(null), [error, setError] = useState(''), [saved, setSaved] = useState(false), [canSave, setCanSave] = useState(true)
   const [panel, setPanel] = useState(false), [tab, setTab] = useState('materials')
   const writeQueue = useRef(Promise.resolve())
+  const currentData = useRef(null)
   const revision = useRef(0)
   const storedRevision = useRef(0)
   const lastSavedData = useRef(null)
@@ -24,9 +27,9 @@ export function Workspace({ children }) {
     storedRevision.current = workspace._revision || 0
     for (const entry of Object.values(workspace.drafts)) readGraph(entry.document, entry.mode)
     lastSavedData.current = workspace
-    setData(workspace)
+    currentData.current=workspace;setData(workspace)
   })
-    .catch(error => { setError(error.message); setCanSave(false); setData(emptyWorkspace()) }) }, [])
+    .catch(error => { setError(error.message); setCanSave(false); currentData.current=emptyWorkspace();setData(currentData.current) }) }, [])
   useEffect(() => {
     if (!data || !canSave) return
     if (data === lastSavedData.current) { setSaved(true); return }
@@ -37,7 +40,7 @@ export function Workspace({ children }) {
     writeQueue.current.then(() => { if (current === revision.current) { setSaved(true); setError('') } }).catch(error => setError(error.message))
   }, [data, canSave])
   const catalog = useMemo(() => createMaterials(data?.mods, resourceCache), [data?.mods])
-  const update = callback => setData(previous => callback(previous))
+  const update = callback => {const next=callback(currentData.current);currentData.current=next;setData(next);return next}
   if (!data) return <p className="workspace-status">Gespeicherte Bibliotheken werden geladen …</p>
   return <Context.Provider value={{ data, update, catalog, openPanel: target => { setTab(target); setPanel(true) } }}>
     <div inert={panel ? true : undefined}>{children}
@@ -142,8 +145,9 @@ function LibraryPanel({ tab, setTab, onClose }) {
             {mod.dependencies.map((dependency, index) => <p key={index} className={dependency.required && !linkedIds.has(dependency.id) ? 'error' : 'hint'}>{dependency.id} {dependency.version} · {dependency.required ? 'erforderlich' : 'optional'}{!linkedIds.has(dependency.id) && dependency.required ? ' · Repository noch verlinken' : ''}</p>)}
             <div className="button-row"><button disabled={busy} onClick={() => importMod(mod)}>Aktualisieren</button><button onClick={() => update(data => ({ ...data, mods: data.mods.filter(item => item.repo !== mod.repo) }))}>Verknüpfung entfernen</button></div>
           </article>)}<p className="hint">Eigene Java-Modell-Loader und erst beim Bauen erzeugte Dateien sind ohne veröffentlichte Ressourcen nicht darstellbar. Fehlende Abhängigkeiten als weiteres Repository verlinken.</p></>}
-        {tab === 'saved' && <><p>{data.graphs.length} gespeicherte Graphen · {data.nodeGroups.length} Knotengruppen. Öffnen und Einfügen erfolgt über die Bibliothek-Leiste des jeweiligen Editors.</p>
-          {[...data.graphs.map(item => ({ ...item, type: 'Graph' })), ...data.nodeGroups.map(item => ({ ...item, type: 'Knotengruppe' }))].map(item => <article className={`saved-entry ${deleteEntry?.id === item.id ? 'delete-armed' : ''}`} key={item.id}><strong>{item.name}</strong><small>{item.type} · {item.mode === 'form' ? 'Copycat' : 'Gebäude'}</small><small>Browser · Version {item.version || 1}</small><button className="danger" disabled={deleteEntry?.id === item.id && dependencies(data,deleteEntry).length>0} onClick={()=>{const entry={...item,collection:item.type === 'Graph' ? 'graphs' : 'nodeGroups'};if(deleteEntry?.id !== item.id) {setDeleteEntry(entry);return} try {update(current=>deleteVersion(current,entry.collection,entry.id));setDeleteEntry(null)} catch(e) {setError(e.message)}}}>{deleteEntry?.id === item.id ? 'Jetzt löschen' : 'Löschen'}</button>{deleteEntry?.id === item.id && <small className="error">{dependencies(data,deleteEntry).length ? `Gesperrt: ${dependencies(data,deleteEntry).join(', ')}` : 'Erneut klicken, um diesen Eintrag endgültig zu löschen.'}<button onClick={()=>setDeleteEntry(null)}>Abbrechen</button></small>}</article>)}
+        {tab === 'saved' && <><p>{data.graphs.length} gespeicherte Graphen · {data.nodeGroups.length} Knotengruppen. Öffnen und Einfügen erfolgt über die Bibliothek des Graphen.</p>
+          {groupVersions([...data.graphs.map(item=>({...item,collection:'graphs',type:'Graphkarte'})),...data.nodeGroups.map(item=>({...item,collection:'nodeGroups',type:'Knotengruppe'}))]).map(group=><article className="saved-entry" key={group.id}><strong>{group.name}</strong><small>{group.type} · {group.versions.length} Versionen</small><button className="danger" onClick={()=>setDeleteEntry(group)}>Versionen löschen …</button></article>)}
+          {deleteEntry && <DeleteDialog group={deleteEntry} initial={deleteEntry.latest.id} onClose={()=>setDeleteEntry(null)} onDeleted={()=>setDeleteEntry(null)}/>}
           <p>Die Daten bleiben in diesem Browser und auf dieser Website. Das Löschen der Websitedaten entfernt auch die Bibliothek.</p>
           <div className="button-row"><button onClick={() => downloadBackup(data)}>Sicherung exportieren</button><button onClick={() => input.current.click()}>Sicherung importieren</button></div>
           <input ref={input} type="file" accept=".json,application/json" hidden onChange={restore} /></>}

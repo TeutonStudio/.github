@@ -1,6 +1,6 @@
 # Graphstudio im Organisationsrepo – erste Fassung und Umbauplan
 
-Stand: 14. November 2026. Zielrepo: `TeutonStudio/.github`.
+Stand: 15. November 2026. Zielrepo: `TeutonStudio/.github`.
 
 ## Zweck und verbindliche Trennung
 
@@ -40,7 +40,7 @@ allein lösen diese Anforderungen nicht.
 
 ## Was diese Fassung bereits liefert
 
-- Organisationsweiter Einstieg mit Form-/Gebäudeeditor und CC-Visual-Teststatus.
+- Organisationsweiter Einstieg mit einer typisierten Copycat-Graphkarte und CC-Visual-Teststatus.
 - Öffentlicher Copycat-Webcode unter `graphstudio/adapters/copycat/web`;
   Herkunft und MIT-Lizenz bleiben erhalten. UI-Änderungen erfolgen künftig hier.
 - Der Fachkern bleibt beim Mod. Der Organisationsbuild lädt exakt den Commit aus
@@ -222,3 +222,34 @@ Die Referenzauswahl im Gebäudegraphen enthält Formen, gespeicherte Graphen, Kn
 Rotationssegmente unterstützen die bisherigen vier überlagerten Y-Drehungen sowie vier aneinanderliegende, gedrehte Blöcke auf einer Fläche von 2×2 Blöcken. Die Länge bestimmt die Zahl der Lagen. Der native Materialauswerter berechnet beide Varianten.
 
 Vektorrechnung und der neue Säulenmodus benötigen Formgraphschema 5 beziehungsweise Gebäudegraphschema 6. Transformationsfunktionen ohne diese Erweiterungen behalten die bisher erforderlichen Schemas 4/5. Der öffentliche Quellen-Pin wird erst nach Veröffentlichung und Prüfung des gemeinsamen Fachkerns aktualisiert.
+
+## Gemeinsame Copycat-Graphkarte (15. November 2026)
+
+Der Copycat-Adapter zeigt einen einzigen Graphen. Am Ergebnisknoten wird der
+Kartentyp gewählt: Copycat, Anzahl, Position, Segment, Fläche, Dach, Gebäude,
+Garten und die weiteren nativen Wertfamilien. Die Anschlussregeln bleiben
+semantisch typisiert. Gebäude sind innerhalb dieser Karte normale Knoten.
+Gespeicherte Form-/Gebäudegraphen werden beim Öffnen in die gemeinsame
+Arbeitsansicht übernommen; ihre unveränderlichen gespeicherten Versionen bleiben
+unverändert. Knotengruppen werden als eigene Karte geöffnet; „Als Referenz
+einfügen“ ist eine eigene Aktion.
+
+Flächen bieten Quadrat (ein Anzahlanschluss), Rechteck (zwei Anzahlanschlüsse)
+und Anklicken (keine Eingänge). Die 2D-Vorschau bearbeitet ganze X/Z-Rasterzellen
+per Maus oder Tastatur; eine Zeichenbewegung ist ein atomarer Undo-Schritt.
+Dynamische Segmentachsen X/Y/Z werden durch Segmentoperatoren weitergereicht
+und erst vom Verbraucher aufgelöst. Eine dynamische Segmentquelle besitzt nur
+den Copycat-Eingang für das Innere. Gespeicherte feste Bereichsbelegungen bleiben
+beim Umschalten erhalten. Neue Dachknoten ordnen Fläche, First, innere/äußere
+Ecke und Wandsegment automatisch zu. Vorlagen sind optional.
+
+Die Bibliothek gruppiert Versionen nach Identität und Sammlung. Ein eigener
+Löschdialog zeigt je Version die Abhängigkeiten. Referenzierte Versionen und der
+gesamte Eintrag bei bestehenden Referenzen sind gesperrt; die Löschung wird bei
+Übernahme nochmals gegen den aktuellen Workspace validiert. Der bestehende
+Speicherabgleich zwischen Browser-Tabs bleibt aktiv.
+
+Neue Flächenmodi, dynamische Segmente und Dachanschlüsse benötigen
+Gebäudegraphschema 7. Typisierte Karten und bearbeitbare Inline-Copycats
+benötigen Schema 8. Bestehende Dokumente ohne diese Eigenschaften behalten ihre
+bisherigen Schemata. Eine bestehende Release-JAR wird dadurch nicht ersetzt.

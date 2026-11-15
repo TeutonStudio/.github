@@ -53,7 +53,12 @@ export function moveViewNodes(document,groups,moved) {
 }
 function reference(entry) {return {documentId:identityOf(entry),version:entry.version || 1,name:entry.name,collection:entry.collection || 'graphs'}}
 function scopeLibrary(entry,namespace,currentLibrary) {
-  const source=entry.library || {},palette=entry.document?.palette || entry.palette || wireModels().Building.default.palette,roles=Object.fromEntries(Object.keys(palette).map(key=>[key,`${namespace}_${key}`]))
+  const scalarTypes=new Set(['INT','POSITION','ROTATION','MIRRORING'])
+  const result=entry.document?.graph?.nodes.find(node=>node.resultType)
+  const scalar=entry.collection==='nodeGroups'
+    ? entry.graphInterface?.outputs?.length ? entry.graphInterface.outputs.every(output=>scalarTypes.has(output.type)) : entry.nodes?.length && entry.nodes.every(node=>/^(INT|POSITION)(_|$)/.test(node.kind) || ['ROTATION','MIRRORING'].includes(node.kind))
+    : scalarTypes.has(result?.resultType)
+  const source=entry.library || {},palette=scalar?{}:entry.document?.palette || entry.palette || wireModels().Building.default.palette,roles=Object.fromEntries(Object.keys(palette).map(key=>[key,`${namespace}_${key}`]))
   const formIds=Object.fromEntries(Object.keys(source.forms || {}).map(key=>[key,`${namespace}_${key}`])),moduleIds=Object.fromEntries(Object.keys(source.modules || {}).map(key=>[key,`${namespace}_${key}`]))
   function scope(value,key) {
     if(Array.isArray(value)) return value.map(item=>scope(item))
@@ -87,7 +92,7 @@ export function previewReferenceEntry(entry,library) {
   }
   return null
 }
-function buildingTemplate(entry) {
+export function buildingTemplate(entry) {
   const forms={...(entry.library?.forms || {})},ids=new Map(entry.nodes.map(n=>[n.id,n])), remapKind={INPUT:'COPYCAT',SAVED:'COPYCAT',ROTATE:'COPYCAT_ROTATE',MIRROR:'COPYCAT_MIRROR',TRANSLATE:'COPYCAT_POSITION',UNION:'COPYCAT_UNION',INTERSECTION:'COPYCAT_INTERSECTION',DIFFERENCE:'COPYCAT_DIFFERENCE',SYMMETRIC_DIFFERENCE:'COPYCAT_SYMMETRIC_DIFFERENCE'}
   const nodes=entry.nodes.map(node=>{
     const target=newNode(true,remapKind[node.kind] || node.kind,node.id,node.x || 0,node.y || 0,true)
@@ -100,7 +105,7 @@ function buildingTemplate(entry) {
       return {...target,form:key,surfaces:Object.keys(surfaces).length?surfaces:null}
     }
     if(['ROTATE','ROTATION'].includes(node.kind) && node.rotationAxis==='NORMAL' && node.quarterTurns) throw new Error('Die ältere lokale Rotationsachse dieser Gruppe zuerst auf X, Y oder Z umstellen.')
-    const common={...target,inputs:(node.inputs || []).map(()=>''),rotationAxis:node.rotationAxis==='NORMAL'?'Y':node.rotationAxis || 'Y',quarterTurns:node.quarterTurns || 0,rotationPivot:node.rotationPivot,translation:node.translation,countValue:node.countValue,copycatTransforms:node.copycatTransforms,mirror:node.mirror}
+    const common={...target,name:node.name || "",materialMode:node.materialMode || "SEPARATED",role:node.materialGroup || "wall",inputs:(node.inputs || []).map(()=>''),rotationAxis:node.rotationAxis==='NORMAL'?'Y':node.rotationAxis || 'Y',quarterTurns:node.quarterTurns || 0,rotationPivot:node.rotationPivot,translation:node.translation,countValue:node.countValue,copycatTransforms:node.copycatTransforms,mirror:node.mirror}
     if(node.kind==='ROTATION') return {...common,inputs:[],rotations:[{axis:common.rotationAxis,quarterTurns:common.quarterTurns}]}
     if(node.kind==='MIRRORING') return {...common,inputs:[],mirrors:[node.mirror || {plane:'X'}]}
     if(['ROTATE','MIRROR','TRANSLATE'].includes(node.kind)) common.inputs=['']
@@ -111,7 +116,7 @@ function buildingTemplate(entry) {
     return {...wire,port:slot===1 && ['ROTATE','MIRROR','TRANSLATE'].includes(target.kind)?{ROTATE:'rotation',MIRROR:'mirroring',TRANSLATE:'positionValue'}[target.kind]:`in:${slot}`}
   })
   const graphInterface=entry.graphInterface && {...entry.graphInterface,inputs:entry.graphInterface.inputs.map(input=>({...input,type:{shape:'COPYCAT',position:'POSITION',rotation:'ROTATION',mirroring:'MIRRORING'}[input.type] || input.type,targets:input.targets.map(target=>({...target,port:Number(target.port)===1 && ['ROTATE','MIRROR','TRANSLATE'].includes(entry.nodes[target.member].kind)?{ROTATE:'rotation',MIRROR:'mirroring',TRANSLATE:'positionValue'}[entry.nodes[target.member].kind]:`in:${target.port}`}))})),outputs:entry.graphInterface.outputs.map(output=>({...output,type:{shape:'COPYCAT',position:'POSITION',rotation:'ROTATION',mirroring:'MIRRORING'}[output.type] || output.type}))}
-  return {...entry,graphInterface,mode:'building',nodes,wires,library:{...(entry.library || {}),forms},palette:entry.palette || {}}
+  return {...entry,graphInterface,mode:'building',nodes,wires,library:{...(entry.library || {}),forms},palette:{...wireModels().Building.default.palette,...Object.fromEntries((entry.groups || []).map(group=>[group.id,entry.materials?.[group.id] || 'minecraft:stone']))}}
 }
 function insertGroup({mode,document,library,materials,entry}) {
   const groupId=fresh('reference'), meta=reference(entry)
@@ -127,10 +132,10 @@ function insertGroup({mode,document,library,materials,entry}) {
     inspect(mode,next)
     return {document:next,library:scoped?.library || mergeLibraries(library,entry.library),materials:{...materials,...result.materials},nodeId:groupId}
   }
-  const namespace='r_'+groupId.slice(-8),scoped=scopeLibrary(entry,namespace,library), source=entry.collection==='libraryModules'?[{...newNode(true,'SEGMENT','module',0,0,false),module:entry.key}]:entry.document.graph.nodes.filter(node=>node.id!=='empty_wall')
+  const namespace='r_'+groupId.slice(-8),scoped=scopeLibrary(entry,namespace,library), source=entry.collection==='libraryModules'?[{...newNode(true,'SEGMENT','module',0,0,false),module:entry.key}]:entry.document.graph.nodes.filter(node=>node.id!=='empty_wall' && !node.resultType)
   const ids=Object.fromEntries(source.map(node=>[node.id,fresh('refnode')])),origin=anchor(source),right=Math.max(...document.graph.nodes.map(n=>n.x || 0))+260
   const nodes=source.map(node=>({...scoped.scope(node),...scoped.scope(remapBuildingReferences(node,ids)),id:ids[node.id],x:position(right+(node.x || 0)-origin.x),y:position(40+(node.y || 0)-origin.y)}))
-  const resultIndex=nodes.findIndex(node=>node.kind==='BUILDING'),group={id:groupId,name:entry.name,nodes:nodes.map(n=>n.id),libraryReference:meta,...((resultIndex>=0 || entry.collection==='libraryModules')?{graphInterface:{inputs:[],outputs:[{id:'result',name:entry.name,type:resultIndex>=0?'BUILDING':'WALL',member:resultIndex>=0?resultIndex:0}]}}:{})}
+  const terminal=entry.document?.graph?.nodes.find(node=>node.resultType),resultIndex=terminal?source.findIndex(node=>node.id===terminal.inputs[0]):nodes.findIndex(node=>node.kind==='BUILDING'),group={id:groupId,name:entry.name,nodes:nodes.map(n=>n.id),libraryReference:meta,...((resultIndex>=0 || entry.collection==='libraryModules')?{graphInterface:{inputs:[],outputs:[{id:'result',name:entry.name,type:resultIndex>=0?(terminal?.resultType || 'BUILDING'):'WALL',member:resultIndex>=0?resultIndex:0}]}}:{})}
   const candidate={...document,palette:{...normalizeDocument(true,document).palette,...scoped.palette},graph:{...document.graph,nodes:[...document.graph.nodes,...nodes],nodeGroups:[...(document.graph.nodeGroups || []),group]}}
   const next=replaceNodes(candidate,candidate.graph.nodes);inspect(mode,next)
   return {document:next,library:scoped.library,materials,nodeId:groupId}

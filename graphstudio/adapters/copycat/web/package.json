@@ -6,7 +6,7 @@
   "scripts": {
     "engine": "bash build-engine.sh",
     "dev": "npm run engine && vite",
-    "test": "npm run engine && node --test",
+    "test": "npm run engine && node --test --test-concurrency=1",
     "build": "npm run engine && vite build && cp ../LICENSE dist/LICENSE"
   },
   "dependencies": {

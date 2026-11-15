@@ -3,7 +3,7 @@
 Gemeinsamer Arbeitsplatz für Copycat- und CC-Visual-Graphen.
 
 Öffentlich: [Graphstudio](https://teutonstudio.github.io/.github/) ·
-[Copycat-Editor](https://teutonstudio.github.io/.github/copycat/?editor=form).
+[Copycat-Editor](https://teutonstudio.github.io/.github/copycat/?editor=graph).
 Der [Plan mit Bestandsaufnahme und Abnahmekriterien](../docs/GRAPHSTUDIO.md)
 beschreibt die erste Fassung und den weiteren CC-Visual-Umbau.
 
@@ -20,7 +20,7 @@ npm run preview
 ```
 
 Vorschau: `http://127.0.0.1:4317/`. Der Copycat-Adapter liegt unter `copycat/`
-und unterstützt `?editor=form` sowie `?graph=building`. Das Prüfmanifest steht
+und verwendet `?editor=graph`; alte Form-/Gebäudelinks öffnen denselben Graphen. Das Prüfmanifest steht
 unter `studio.json`, der Fachkernvertrag unter `copycat/compatibility.json`.
 
 `sources.lock.json` legt den öffentlichen Modquellstand fest. Der Build lädt ihn
@@ -58,8 +58,8 @@ Vorschau: `http://127.0.0.1:4318/`. Sie bindet nur an Loopback.
 
 Transformationen benötigen Formgraphschema 4 bzw. Gebäudegraphschema 5; Vektorrechnung und der aneinanderliegende Säulenmodus benötigen Schema 5 bzw. 6.
 `sources.lock.json` pinnt den veröffentlichten Fachkerncommit
-[`79f5157`](https://github.com/TeutonStudio/Copycat-Architecture/commit/79f51576ee349a8b519299a1689cfae45661d4a7)
-auf Basis 0.6.4, Branch `codex/graphstudio-values-and-references`. Der neuere Mod-Hauptzweig
+[`629531f`](https://github.com/TeutonStudio/Copycat-Architecture/commit/629531f65a272476c42ad696405f75ebf06e1e84)
+auf Basis 0.6.4, Branch `codex/area-grid-dynamic-segments`. Der neuere Mod-Hauptzweig
 und vorhandene Release-JARs werden dadurch nicht ersetzt. Der öffentliche Build
 prüft weiterhin saubere, gepinnte Quellen und den Mindestvertrag in
 `adapters/copycat/core-contract.json`.
@@ -100,3 +100,16 @@ auch wenn der entfernte Bereich innerhalb einzelner Kollisionszellen liegt.
 Dachformen an den tatsächlich gerenderten Dreiecken: Volumen, freie Sicht durch
 den Ausschnitt, Materialgruppen, Gebäudewiederholungen, leere Ergebnisse und
 unveränderte Rasterformen.
+
+## Graphkarten, Rasterflächen und dynamische Segmente
+
+Ein Graph enthält alle nativen Knotenfamilien. Der Ergebnisknoten bestimmt den
+Ausgabetyp der Karte. Gespeicherte Knotengruppen werden als eigene Karten
+geöffnet; Referenzen werden über die separate Einfügeaktion angelegt.
+Bibliotheksversionen erscheinen unter einem gemeinsamen Eintrag. Im Löschdialog
+werden versionengenaue Abhängigkeiten und Sperren angezeigt.
+
+Flächen: Quadrat, Rechteck oder direkt im 2D-Raster zeichnen. Dynamische
+Segmentachsen werden erst am Raum/Dach aufgelöst. Neue Dachknoten bieten fünf
+Vorlagenanschlüsse und ermitteln deren Anwendungsstellen automatisch.
+Flächen/Dynamik benötigen Gebäudegraphschema 7, gemeinsame Karten Schema 8.

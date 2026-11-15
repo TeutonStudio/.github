@@ -13,14 +13,17 @@ export function dependencies(workspace, entry) {
   const matches = []
   for (const owner of [...workspace.graphs,...workspace.nodeGroups,...Object.values(workspace.drafts)]) {
     if (owner.id === entry.id) continue
-    const label = owner.name || owner.document?.name || 'Aktueller Entwurf'
-    for (const ref of owner.references || []) if (keys.has(ref)) matches.push(label)
-    for(const group of owner.document?.graph?.nodeGroups || []) if(group.libraryReference?.documentId===identityOf(entry) && group.libraryReference.version===(entry.version || 1)) matches.push(`${label} · ${group.name}`)
+    const title = owner.name || owner.document?.name || 'Aktueller Entwurf'
+    const label = title + (owner.version ? ` · v${owner.version}` : !owner.id && owner.document ? ' · Entwurf' : '')
+    let used=false
+    for (const ref of owner.references || []) if (keys.has(ref)) used=true
+    for(const group of owner.document?.graph?.nodeGroups || []) if(group.libraryReference?.documentId===identityOf(entry) && group.libraryReference.version===(entry.version || 1)) used=true
     // A source copied into the owner's library is independent and survives deletion.
     for (const node of owner.document?.graph?.nodes || owner.nodes || []) {
-      if (node.libraryReference?.documentId === identityOf(entry) && node.libraryReference.version === (entry.version || 1)) matches.push(`${label} · ${node.id}`)
-      if (keys.has(node.form) && !owner.library?.forms?.[node.form]) matches.push(`${label} · ${node.id}`)
+      if (node.libraryReference?.documentId === identityOf(entry) && node.libraryReference.version === (entry.version || 1)) used=true
+      if (keys.has(node.form) && !owner.library?.forms?.[node.form]) used=true
     }
+    if(used) matches.push(label)
   }
   return [...new Set(matches)]
 }
@@ -33,7 +36,7 @@ export function deleteVersion(workspace, collection, id) {
 }
 export function validateReferences(document, library = {}) {
   for (const node of document.graph.nodes) {
-    if (node.kind === 'COPYCAT' && !node.block && node.form && !library.forms?.[node.form]) throw new Error(`Fehlende Formreferenz: ${node.form}`)
+    if (node.kind === 'COPYCAT' && !node.inlinePart && !node.block && node.form && !library.forms?.[node.form]) throw new Error(`Fehlende Formreferenz: ${node.form}`)
     if (node.module && !library.modules?.[node.module]) throw new Error(`Fehlende Segmentreferenz: ${node.module}`)
   }
   return document

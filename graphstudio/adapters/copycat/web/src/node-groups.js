@@ -5,7 +5,7 @@ import { applyWires, connections, formGroups, inspect, protectedNode, replaceNod
 
 export function saveNodeGroup(mode, document, ids, name, materials = {}, library = null) {
   const entries = inspect(mode, document)
-  const selected = new Set(entries.filter(({ node }) => ids.includes(node.id) && !protectedNode(node)).map(({ node }) => node.id))
+  const selected = new Set(entries.filter(({ node }) => ids.includes(node.id) && !protectedNode(node,document)).map(({ node }) => node.id))
   if (!selected.size) throw new Error('Mindestens einen bearbeitbaren Knoten auswählen. Ergebnis und Standard-Leerwand gehören nicht zur Knotengruppe.')
   const used = new Set([formGroups(document)[0].id, ...entries.filter(({ node }) => selected.has(node.id)).flatMap(({ node }) => [
     node.part?.group, ...(node.savedCopycat?.parts || []).map(part => part.group),
@@ -13,7 +13,7 @@ export function saveNodeGroup(mode, document, ids, name, materials = {}, library
   ])])
   const sourceGroup=document.graph.nodeGroups?.find(group=>group.nodes.length===selected.size && group.nodes.every(id=>selected.has(id)))
   const groupNodes=sourceGroup ? sourceGroup.nodes.map(id=>document.graph.nodes.find(node=>node.id===id)) : document.graph.nodes.filter(node=>selected.has(node.id))
-  return { graphInterface:sourceGroup?.graphInterface?structuredClone(sourceGroup.graphInterface):undefined,id: crypto.randomUUID(), name: name.trim() || 'Knotengruppe', mode, palette:mode==='building'?structuredClone(document.palette):undefined, materials: structuredClone(materials), library: mode === 'building' ? structuredClone(library) : null,
+  return { nodeGroups:structuredClone((document.graph.nodeGroups || []).filter(group=>group.nodes.every(id=>selected.has(id)))), graphInterface:sourceGroup?.graphInterface?structuredClone(sourceGroup.graphInterface):undefined,id: crypto.randomUUID(), name: name.trim() || 'Knotengruppe', mode, palette:mode==='building'?structuredClone(document.palette):undefined, materials: structuredClone(materials), library: mode === 'building' ? structuredClone(library) : null,
     nodes: structuredClone(groupNodes),
     wires: connections(entries).filter(wire => selected.has(wire.source) && selected.has(wire.target)),
     groups: mode === 'form' ? structuredClone(formGroups(document).filter(group => used.has(group.id))) : [] }

@@ -47,6 +47,7 @@ internal object GraphModels {
                 val actual=when(field) {
                     "assembly"->node.assembly.toString();"id"->node.id
                     "roomConfig.mode"->node.roomConfig?.mode?.name;"storeyMode"->node.storeyMode;"roofType"->node.roofType
+                    "areaMode"->node.areaMode?.name;"adaptiveRoof"->node.adaptiveRoof.toString();"resultType"->node.resultType
                     else->error("Unknown graph port condition $field")
                 }
                 val value=rule.conditions[field]

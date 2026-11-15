@@ -61,13 +61,19 @@ export function applyCopycatOption({ mode, document, library = { forms: {}, modu
   const original = target && document.graph.nodes.find(node => node.id === target.id)
 
   if (mode === 'building') {
+    if(part) {
+      const node=original ?? newNode(true,'COPYCAT',sourceId(),40,100,true)
+      const next={...node,name:entry.name,inlinePart:{...part,group:'body'},surfaces:{},block:'',rotationAxis:'Y',quarterTurns:0}
+      const nodes=original?document.graph.nodes.map(n=>n.id===node.id?next:n):[...document.graph.nodes,next]
+      return {document:replaceNodes(document,nodes),library,materials,nodeId:node.id}
+    }
     if (option.kind === 'library') {
       // Validate the current library content, including its compiled result.
       // Keeping the reference avoids creating a duplicate browser snapshot.
       writeGraph('form', entry.document)
       const node = original ?? newNode(true, 'COPYCAT', sourceId(), 40, 100)
       const nextNode = {
-        ...node, name: entry.name, form: option.reference, block: '',
+        ...node, name: entry.name, form: option.reference, inlinePart:null, block: '',
         surfaces: node.form === option.reference ? node.surfaces : {},
         rotationAxis: 'Y', quarterTurns: 0,
       }
@@ -79,7 +85,7 @@ export function applyCopycatOption({ mode, document, library = { forms: {}, modu
     }
     if (typeof entry.id !== 'string' || !entry.id) throw new Error('Die ausgewählte Form hat keine gültige Kennung.')
     const prepared = original ? replaceNodes(document, document.graph.nodes.map(node => node.id === original.id
-      ? { ...node, block: '', rotationAxis: 'Y', quarterTurns: 0 } : node)) : document
+      ? { ...node, inlinePart:null, block: '', rotationAxis: 'Y', quarterTurns: 0 } : node)) : document
     const result = loadBuildingCopycat(prepared, library, entry, target?.id)
     return { ...result, materials }
   }
