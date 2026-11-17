@@ -118,14 +118,14 @@ export function buildingTemplate(entry) {
   const graphInterface=entry.graphInterface && {...entry.graphInterface,inputs:entry.graphInterface.inputs.map(input=>({...input,type:{shape:'COPYCAT',position:'POSITION',rotation:'ROTATION',mirroring:'MIRRORING'}[input.type] || input.type,targets:input.targets.map(target=>({...target,port:Number(target.port)===1 && ['ROTATE','MIRROR','TRANSLATE'].includes(entry.nodes[target.member].kind)?{ROTATE:'rotation',MIRROR:'mirroring',TRANSLATE:'positionValue'}[entry.nodes[target.member].kind]:`in:${target.port}`}))})),outputs:entry.graphInterface.outputs.map(output=>({...output,type:{shape:'COPYCAT',position:'POSITION',rotation:'ROTATION',mirroring:'MIRRORING'}[output.type] || output.type}))}
   return {...entry,graphInterface,mode:'building',nodes,wires,library:{...(entry.library || {}),forms},palette:{...wireModels().Building.default.palette,...Object.fromEntries((entry.groups || []).map(group=>[group.id,entry.materials?.[group.id] || 'minecraft:stone']))}}
 }
-function insertGroup({mode,document,library,materials,entry}) {
+function insertGroup({mode,document,library,materials,entry,placement}) {
   const groupId=fresh('reference'), meta=reference(entry)
   if(entry.collection==='nodeGroups') {
     const source=entry.mode===mode?entry:mode==='building' && entry.mode==='form'?buildingTemplate(entry):null
     if(!source) throw new Error('Diese Knotengruppe benötigt den anderen Graphtyp.')
     const scoped=mode==='building'?scopeLibrary(source,'r_'+groupId.slice(-8),library):null
     const template=scoped?{...source,nodes:source.nodes.map(node=>scoped.scope(node)),library:scoped.library}:source
-    const result=insertNodeGroup(document,template), oldIds=new Set(document.graph.nodes.map(n=>n.id)), ids=result.document.graph.nodes.filter(n=>!oldIds.has(n.id)).map(n=>n.id)
+    const result=insertNodeGroup(document,template,undefined,placement), oldIds=new Set(document.graph.nodes.map(n=>n.id)), ids=result.document.graph.nodes.filter(n=>!oldIds.has(n.id)).map(n=>n.id)
     const group={id:groupId,name:entry.name,nodes:ids,libraryReference:meta,...(source.graphInterface?{graphInterface:source.graphInterface,inputConnections:{}}:{})}
     const palette=scoped?{...normalizeDocument(true,result.document).palette,...scoped.palette}:result.document.palette
     const next={...result.document,...(palette?{palette}:{}),graph:{...result.document.graph,nodes:result.document.graph.nodes.map(node=>scoped && ids.includes(node.id)?scoped.scope(node):node),nodeGroups:[...(result.document.graph.nodeGroups || []),group]}}
@@ -134,7 +134,11 @@ function insertGroup({mode,document,library,materials,entry}) {
   }
   const namespace='r_'+groupId.slice(-8),scoped=scopeLibrary(entry,namespace,library), source=entry.collection==='libraryModules'?[{...newNode(true,'SEGMENT','module',0,0,false),module:entry.key}]:entry.document.graph.nodes.filter(node=>node.id!=='empty_wall' && !node.resultType)
   const ids=Object.fromEntries(source.map(node=>[node.id,fresh('refnode')])),origin=anchor(source),right=Math.max(...document.graph.nodes.map(n=>n.x || 0))+260
-  const nodes=source.map(node=>({...scoped.scope(node),...scoped.scope(remapBuildingReferences(node,ids)),id:ids[node.id],x:position(right+(node.x || 0)-origin.x),y:position(40+(node.y || 0)-origin.y)}))
+  const nodes=source.map(node=>{
+    const x=(placement?.x ?? right)+(node.x || 0)-origin.x,y=(placement?.y ?? 40)+(node.y || 0)-origin.y
+    if(placement && (x<model.positionMin || x>model.positionMax || y<model.positionMin || y>model.positionMax)) throw new Error('Die Referenz passt an dieser Knotenposition nicht in den Graphbereich.')
+    return {...scoped.scope(node),...scoped.scope(remapBuildingReferences(node,ids)),id:ids[node.id],x:position(x),y:position(y)}
+  })
   const terminal=entry.document?.graph?.nodes.find(node=>node.resultType),resultIndex=terminal?source.findIndex(node=>node.id===terminal.inputs[0]):nodes.findIndex(node=>node.kind==='BUILDING'),group={id:groupId,name:entry.name,nodes:nodes.map(n=>n.id),libraryReference:meta,...((resultIndex>=0 || entry.collection==='libraryModules')?{graphInterface:{inputs:[],outputs:[{id:'result',name:entry.name,type:resultIndex>=0?(terminal?.resultType || 'BUILDING'):'WALL',member:resultIndex>=0?resultIndex:0}]}}:{})}
   const candidate={...document,palette:{...normalizeDocument(true,document).palette,...scoped.palette},graph:{...document.graph,nodes:[...document.graph.nodes,...nodes],nodeGroups:[...(document.graph.nodeGroups || []),group]}}
   const next=replaceNodes(candidate,candidate.graph.nodes);inspect(mode,next)
@@ -144,11 +148,13 @@ export function insertSavedReference({mode,document,library,materials,entry,curr
   const reason=referenceDisabled(entry,currentIdentity,false,mode)
   if(reason) throw new Error(reason)
   const originalEntries=inspect(mode,document), originalGroups=groupViews(document,originalEntries), oldGroup=originalGroups.find(group=>group.id===targetId)
+  const oldNode=originalEntries.find(entry=>entry.node.id===targetId)?.node,placement=oldGroup?.position || (oldNode?{x:oldNode.x,y:oldNode.y}:null)
+  if(targetId && !placement) throw new Error('Der zu ersetzende Knoten existiert nicht mehr.')
   const removed=new Set(oldGroup?.nodes || (targetId?[targetId]:[])), originalWires=connections(originalEntries)
   const outgoing=originalWires.filter(wire=>removed.has(wire.source) && !removed.has(wire.target))
   const incoming=originalWires.filter(wire=>!removed.has(wire.source) && removed.has(wire.target))
   const base=removed.size?applyWires(mode,document,originalEntries,originalWires.filter(wire=>!removed.has(wire.source) && !removed.has(wire.target)),[...removed]):document
-  let result=entry.mode==='form' && entry.collection!=='nodeGroups'?insertFormReference({mode,document:base,library,materials,entry,currentIdentity}):insertGroup({mode,document:base,library,materials,entry})
+  let result=entry.mode==='form' && entry.collection!=='nodeGroups'?insertFormReference({mode,document:base,library,materials,entry,currentIdentity,placement}):insertGroup({mode,document:base,library,materials,entry,placement})
   const nextEntries=inspect(mode,result.document),newGroup=groupViews(result.document,nextEntries).find(group=>group.id===result.nodeId), outputs=newGroup?.outputs || [{id:result.nodeId,type:nextEntries.find(e=>e.node.id===result.nodeId).outputType}],ports=newGroup?.ports || nextEntries.find(e=>e.node.id===result.nodeId).ports.map(port=>({...port,targetNode:result.nodeId,targetPort:port.id}))
   const wires=connections(nextEntries)
   for(const wire of outgoing) {
