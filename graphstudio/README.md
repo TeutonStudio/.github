@@ -23,6 +23,12 @@ Vorschau: `http://127.0.0.1:4317/`. Der Copycat-Adapter liegt unter `copycat/`
 und verwendet `?editor=graph`; alte Form-/Gebäudelinks öffnen denselben Graphen. Das Prüfmanifest steht
 unter `studio.json`, der Fachkernvertrag unter `copycat/compatibility.json`.
 
+Die Grundformenauswahl übernimmt alle 21 Einträge aus dem nativen Katalog,
+inklusive Dach, halber Scheibe und Viertelscheibe. „Grundform wählen …“ öffnet
+auch beim Ersetzen einer gespeicherten Referenz direkt die Grundformen.
+Dachgeometrie und Scheibenanteil sind auch bei Grundformen im Referenzknoten
+bearbeitbar; die gewählte Variante bleibt beim Speichern und Laden erhalten.
+
 `sources.lock.json` legt den öffentlichen Modquellstand fest. Der Build lädt ihn
 in `.cache`, kopiert den organisationsseitigen Webcode darüber und führt die
 Modtests, Browsertests und den JVM-Rückimport aus. Erst dann entsteht `dist`.

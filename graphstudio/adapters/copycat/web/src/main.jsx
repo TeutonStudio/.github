@@ -18,6 +18,7 @@ import { SplitHandle } from './SplitHandle.jsx'
 import { Workspace, useWorkspace } from './Workspace.jsx'
 import { loadBuildingCopycat, loadFormCopycatWithMaterials } from './copycat-library.js'
 import { applyCopycatOption } from './copycat-selection.js'
+import { copycatPickerSelection } from './copycat-options.js'
 import { insertNodeGroup, mergeLibraries, saveNodeGroup } from './node-groups.js'
 import baseLibrary from '../../examples/library.json'
 import formExample from '../../examples/nodegraph-form.json'
@@ -316,8 +317,7 @@ function Studio({ mode, active }) {
     if (readOnly) return
     setFileDialog(false)
     const node = entries.find(entry => entry.node.id === nodeId)?.node
-    const initialId = node?.inlinePart ? `base:${node.inlinePart.source}` : node?.kind === 'INPUT' ? `base:${node.part.source}` : node?.kind === 'COPYCAT' ? `library:${node.form}` : null
-    setCopycatPicker({ nodeId, initialId, initialCategory: node && node.kind !== 'INPUT' && !node.inlinePart ? 'saved' : 'basic' })
+    setCopycatPicker({ nodeId, ...copycatPickerSelection(node, basic) })
   }
   const applyCopycat = option => {
     const result = applyCopycatOption({ mode, document, library, materials, nodeId: copycatPicker.nodeId, option })

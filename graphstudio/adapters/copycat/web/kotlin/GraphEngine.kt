@@ -62,6 +62,10 @@ fun graphModels(): Json = json(
         }
     }.toTypedArray()),
     "shapes" to Adapters.all.values.map { json("id" to it.source, "name" to it.name, "max" to it.max, "tiltable" to it.tiltable) }.toTypedArray(),
+    "baseShapes" to BaseShapes.all.map { shape ->
+        val part=shape.part().let { if(it.source==RoofPartParameters.SOURCE) it.copy(roof=RoofPartParameters()) else it }
+        json("id" to shape.id,"source" to shape.source,"discCut" to shape.discCut,"name" to shape.name,"part" to encodePart(part))
+    }.toTypedArray(),
     "roofSlopes" to RoofSlope.presets.map { json("p" to it.p,"q" to it.q) }.toTypedArray(),
     "rotationAxes" to RotationAxis.entries.map { it.name }.toTypedArray(),
     "materialModes" to MaterialMode.entries.map { it.name }.toTypedArray(),
@@ -467,8 +471,15 @@ fun editInspectorNode(isBuilding:Boolean,document:dynamic,value:dynamic):Json {
         }
         val changed=graph.replace(node);GraphCompiler.structure(changed,groups(document));return encodeNodeGraph(changed)
     }
-    val original=buildingGraph(document.graph);val node=decodeBuildingNode(value)
+    val original=buildingGraph(document.graph);var node=decodeBuildingNode(value)
     val before=original.nodes.first { it.id==node.id }
+    node.inlinePart?.let { part ->
+        if(part.roof!=before.inlinePart?.roof && part.source==RoofPartParameters.SOURCE) {
+            val edited=part.copy(exact=null,exactClip=null)
+            require(!Geometry.exact(edited).isEmpty()) { "Roof slice must contain geometry" }
+            node=node.copy(inlinePart=edited)
+        }
+    }
     var changed=original
     if(before.coordinates!=node.coordinates) {
         changed=when(before.kind) {

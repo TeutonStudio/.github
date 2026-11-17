@@ -41,7 +41,8 @@ run('npm', ['ci', '--no-audit', '--no-fund'], web)
 // Exchange outputs belong to one source revision. Regenerate them before the
 // first JVM pass so a reused build cache cannot validate stale browser exports.
 rmSync(join(work, 'build/graphstudio-exchange'), { recursive: true, force: true })
-run('./gradlew', ['test'], work)
+// The exchange directory was cleared above; regenerate it even with a warm Gradle cache.
+run('./gradlew', ['test', '--rerun'], work)
 run('npm', ['test'], web)
 run('./gradlew', ['test', '--tests', '*GraphstudioExchangeTest.browserExports', '--rerun'], work)
 const exchangeReport = readFileSync(join(work, 'build/test-results/test/TEST-de.teutonstudio.copycatarchitect.GraphstudioExchangeTest.xml'), 'utf8')
