@@ -58,8 +58,8 @@ Vorschau: `http://127.0.0.1:4318/`. Sie bindet nur an Loopback.
 
 Transformationen benötigen Formgraphschema 4 bzw. Gebäudegraphschema 5; Vektorrechnung und der aneinanderliegende Säulenmodus benötigen Schema 5 bzw. 6.
 `sources.lock.json` pinnt den veröffentlichten Fachkerncommit
-[`629531f`](https://github.com/TeutonStudio/Copycat-Architecture/commit/629531f65a272476c42ad696405f75ebf06e1e84)
-auf Basis 0.6.4, Branch `codex/area-grid-dynamic-segments`. Der neuere Mod-Hauptzweig
+[`a21a968`](https://github.com/TeutonStudio/Copycat-Architecture/commit/a21a9688418a6f0569235cd8df1fa4a56b97bab0)
+auf Basis 0.6.4, Branch `codex/graphstudio-reference-rotation`. Der neuere Mod-Hauptzweig
 und vorhandene Release-JARs werden dadurch nicht ersetzt. Der öffentliche Build
 prüft weiterhin saubere, gepinnte Quellen und den Mindestvertrag in
 `adapters/copycat/core-contract.json`.
@@ -100,6 +100,12 @@ auch wenn der entfernte Bereich innerhalb einzelner Kollisionszellen liegt.
 Dachformen an den tatsächlich gerenderten Dreiecken: Volumen, freie Sicht durch
 den Ausschnitt, Materialgruppen, Gebäudewiederholungen, leere Ergebnisse und
 unveränderte Rasterformen.
+
+Auch Drehungen direkt am Referenzknoten erhalten diese Ausschnitte und ihre
+Materialgruppen. Der Fachkern hält temporäre Transformationsergebnisse als
+gültige gespeicherte Quellgraphen. `reference-rotation.test.js` prüft Raster-
+und exakte Dach-XOR-Ausschnitte um X/Y/Z mit 90°, 180° und 270°, JSON-Rundlauf
+und anschließende Drehungen in Segmenten.
 
 ## Graphkarten, Rasterflächen und dynamische Segmente
 
