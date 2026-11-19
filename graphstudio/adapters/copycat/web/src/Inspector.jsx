@@ -1,3 +1,4 @@
+import { families,operatorIdentity,signature } from './operators.js'
 import { cardTypeLabel } from './card-types.js'
 import { IntegerField } from './IntegerField.jsx'
 import { MirrorPlanePicker } from './MirrorPlanePicker.jsx'
@@ -9,7 +10,7 @@ import { formGroups, model } from './model.js'
 import { MaterialField } from './Workspace.jsx'
 import { copycatShapeName } from './copycat-options.js'
 
-export const names = { REFERENCE:'Referenz',VECTOR_SPLIT:'Position zerlegen',
+export const names = { ...Object.fromEntries(Object.entries(families).map(([kind,f])=>[kind,f.label])), REFERENCE:'Referenz',VECTOR_SPLIT:'Position zerlegen',
   INT_ADD: 'Anzahl addieren',
   INT_SUBTRACT: 'Anzahl subtrahieren',
   INT_MULTIPLY: 'Anzahl multiplizieren',
@@ -39,6 +40,7 @@ export const names = { REFERENCE:'Referenz',VECTOR_SPLIT:'Position zerlegen',
 }
 
 export function portName(port, node) {
+  if(families[node.kind]) { const i=Number(port.id.replace('in:','')),op=signature(node),raw=op.types[Math.min(i,op.types.length-1)],type=raw==='geometry'?families[node.kind].output:raw;return `${['A','B','C'][i] || i+1} · ${type==='BOOLEAN'?'Aussage':type==='INT'?'Anzahl':type==='shape'?'Copycat':type==='segment'?'Segment':type==='position'?'Position':type==='rotation'?'Rotation':'Spiegelung'}${op.optional?.includes(i)?' (optional)':''}` }
   const native = { length: 'Länge (Y)', roofPeak: 'Dachspitze (optional)', roofEave: 'Dachendkante / Traufe (optional)', layout: 'Anordnung', geometry: 'Grundriss', area: 'Fläche', tread: 'Stufen', landing: 'Podest', enclosure: 'Schachtwände' }
   if(node.kind==='AREA' && ['length','height'].includes(port.id)) return `${node.areaMode==='SQUARE'?'Seitenlänge':port.id==='length'?'Breite X':'Länge Z'} · Anzahl`
   if (native[port.id]) return native[port.id]

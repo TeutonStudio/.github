@@ -11,6 +11,10 @@ internal object GraphModels {
     private fun ints(value:dynamic)=list(value).map { it.unsafeCast<Int>() }.toSet()
     val copycat=Model(catalog.copycat)
     val building=Model(catalog.building)
+    val operators:Map<String,UnifiedOperators.Family> = names(catalog.operators).associateWith { kind ->
+        val f=catalog.operators[kind]
+        UnifiedOperators.Family(f.label as String,f.description as String,f.output as String,f.default as String,names(f.operations).associateWith { key -> val op=f.operations[key];UnifiedOperators.Operation(op.label as String,op.description as String,list(op.types).map { it as String },op.min as Int,op.max as Int,list(op.optional).map { it as Int }) })
+    }
     val coordinates=-8192..8192
     const val FORM_NODES=64
     const val FORM_SOURCES=32
@@ -34,7 +38,7 @@ internal object GraphModels {
         return value
     }
     fun newShape(kind:NodeKind):GraphNode = decodeGraphNode(defaults(catalog.copycat,kind.name,catalog.copycat.nodes[kind.name].defaults))
-        .copy(inputs=List(if(kind==NodeKind.MIRROR) 2 else if(kind==NodeKind.POSITION) 3 else inputs(kind).first) { "" })
+        .let { n->n.copy(inputs=List(if(kind==NodeKind.MIRROR) 2 else if(kind==NodeKind.POSITION) 3 else UnifiedOperators.shapeInputs(n).min) { "" }) }
     fun newBuilding(kind:BuildingKind,explicit:Boolean):BuildingNode {
         val model=catalog.building.nodes[kind.name]
         return decodeBuildingNode(defaults(catalog.building,kind.name,if(explicit || model.alwaysExplicit==true) model.defaults else model.legacyDefaults))
@@ -71,9 +75,8 @@ internal object GraphModels {
         val inputs=if(value.inputs==null) null else ShapeInputs(value.inputs)
         val ports=list(value.ports).map(::BuildingPortModel)
     }
-    class ShapeInputs(value:dynamic) {
-        val min=value.min.unsafeCast<Int>();val max=value.max.unsafeCast<Int>()
-        private val types=list(value.types).map { it.unsafeCast<String>() }
+    class ShapeInputs(val min:Int,val max:Int,private val types:List<String>) {
+        constructor(value:dynamic):this(value.min.unsafeCast<Int>(),value.max.unsafeCast<Int>(),list(value.types).map { it.unsafeCast<String>() })
         fun type(slot:Int)=types.getOrElse(slot) { types.last() }
     }
     class BuildingPortModel(value:dynamic) {

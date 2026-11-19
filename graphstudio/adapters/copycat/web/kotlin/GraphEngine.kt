@@ -49,7 +49,7 @@ fun exportDocument(isBuilding:Boolean,document:dynamic):Json = if(isBuilding) {
 
 @JsExport
 fun graphModels(): Json = json(
-    "cardTypes" to GraphCards.types.toTypedArray(),"release" to graphRelease,"catalogSha256" to graphCatalogHash,
+    "operators" to JSON.parse<dynamic>(graphCatalogJson).operators,"cardTypes" to GraphCards.types.toTypedArray(),"release" to graphRelease,"catalogSha256" to graphCatalogHash,
     "copycatSchemas" to GraphModels.copycat.graphSchemas.toTypedArray(),
     "buildingSchemas" to GraphModels.building.graphSchemas.toTypedArray(),
     "form" to browserFormKinds.map { kind -> json("kind" to kind.name,
@@ -79,8 +79,8 @@ private fun inspectBuilding(n:BuildingNode,graph:BuildingGraph):Json=json("dynam
     "ports" to BuildingPorts.of(n,graph,true).map { port -> json("id" to port.key,"source" to port.source,"accepts" to port.accepts.map { it.name }.toTypedArray(),
         "types" to port.accepts.map(::buildingGraphType).distinct().toTypedArray(),"length" to port.length,"height" to port.height) }.toTypedArray())
 private fun inspectShape(value:GraphNode):Json { val n=value.withValueSockets();return json("node" to value.jsNode(),"outputType" to GraphModels.shape(n.kind).output,
-    "ports" to n.inputs.mapIndexed { index,source -> json("id" to index.toString(),"source" to source,"types" to arrayOf(GraphModels.shape(n.kind).inputs!!.type(index)),
-        "accepts" to browserFormKinds.filter { GraphModels.accepts(n.kind,index,it) }.map { it.name }.toTypedArray()) }.toTypedArray()) }
+    "ports" to n.inputs.mapIndexed { index,source -> json("id" to index.toString(),"source" to source,"types" to arrayOf(UnifiedOperators.shapeInputs(n).type(index)),
+        "accepts" to browserFormKinds.filter { GraphModels.shape(it).output==UnifiedOperators.shapeInputs(n).type(index) }.map { it.name }.toTypedArray()) }.toTypedArray()) }
 
 @JsExport
 fun describeNode(isBuilding:Boolean,document:dynamic,id:String):Json = if(isBuilding) {
@@ -229,7 +229,7 @@ fun previewGraph(isBuilding: Boolean, document: dynamic, library: dynamic, selec
         if(n.kind in CopycatTransforms.valueKinds) {
             GraphCompiler.structure(graph,original.groups)
             return json("count" to 0, "raw" to 0, "meshes" to emptyArray<Json>(),
-            "value" to when { n.kind.name in GraphValues.vectorKinds->"Position: ${GraphValues.shape(graph.nodes.associateBy { it.id }).vector(n.id)} hB";n.kind.name in GraphValues.integerKinds->"Anzahl: ${GraphValues.shape(graph.nodes.associateBy { it.id }).integer(n.id)}";n.kind==NodeKind.MIRRORING->"Spiegelung: ${(n.mirror ?: CopycatMirror()).plane}";else->"${n.rotationAxis.name}: ${n.quarterTurns*90}°" }, "warnings" to arrayOf("Parameterwert, keine Geometrie"))
+            "value" to when { n.kind.name in UnifiedOperators.valueKinds->UnifiedOperators.value(UnifiedOperators.valueNodes(graph.nodes),n.id).toString();n.kind.name in GraphValues.vectorKinds->"Position: ${GraphValues.shape(graph.nodes.associateBy { it.id }).vector(n.id)} hB";n.kind.name in GraphValues.integerKinds->"Anzahl: ${GraphValues.shape(graph.nodes.associateBy { it.id }).integer(n.id)}";n.kind==NodeKind.MIRRORING->"Spiegelung: ${(n.mirror ?: CopycatMirror()).plane}";else->"${n.rotationAxis.name}: ${n.quarterTurns*90}°" }, "warnings" to arrayOf("Parameterwert, keine Geometrie"))
         }
         val parts = if(selected.isEmpty()) GraphCompiler.compile(graph,original.groups) else GraphCompiler.intermediate(graph,n.id,original.groups)
         val filter = if(n.kind==NodeKind.OUTPUT) n.previewGroup else ""
@@ -246,6 +246,10 @@ fun previewGraph(isBuilding: Boolean, document: dynamic, library: dynamic, selec
     val result=graph.resultNode()
     val cardTarget=if((selected.isEmpty() || selected==result.id) && result.resultType!=null) result.inputs.firstOrNull().orEmpty().also { require(it.isNotEmpty()) { "Connect the graph result" } } else selected
     val selectedNode=graph.nodes.firstOrNull { it.id==cardTarget }
+    if(selectedNode?.kind?.name in UnifiedOperators.valueKinds) {
+        val value=UnifiedOperators.value(UnifiedOperators.buildingValueNodes(graph.nodes),selectedNode!!.id)
+        return json("count" to 0,"raw" to 0,"meshes" to emptyArray<Json>(),"value" to value.toString())
+    }
     if(selectedNode?.kind?.name in GraphValues.kinds) {
         BuildingGraphCompiler.structure(graph)
         return json("count" to 0,"raw" to 0,"meshes" to emptyArray<Json>(),"value" to if(selectedNode!!.kind.name in GraphValues.integerKinds) "Anzahl: ${GraphValues.building(graph.nodes.associateBy { it.id }).integer(selectedNode.id)}" else "Position: ${GraphValues.building(graph.nodes.associateBy { it.id }).vector(selectedNode.id)} hB")

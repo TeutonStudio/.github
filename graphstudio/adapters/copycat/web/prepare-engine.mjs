@@ -18,6 +18,6 @@ const manifest = {
   release, catalogSha256: hash(catalogue), domainSha256: sourceHash,
   copycat: { nodes: Object.keys(model.copycat.nodes), graphSchemas: model.copycat.graphSchemas, documentSchemas: model.copycat.documentSchemas },
   building: { nodes: Object.keys(model.building.nodes), graphSchemas: model.building.graphSchemas, documentSchemas: model.building.documentSchemas },
-  features: ['projection', 'nodeGroups', 'namedGroupInputs', 'sharedGroupDefinitions', 'exactGeometry', 'roofTemplates', 'specialRooms', 'copycatTransforms', 'typedCopycatTransforms', 'graphDuplication', 'semanticPorts', 'immutableLibraryVersions', 'folderCopycatPicker', 'areaRaster', 'dynamicSegments', 'adaptiveRoofSegments', 'typedGraphCards', 'groupedLibraryVersions'],
+  features: ['unifiedOperators', 'exactSegmentOperators', 'logicalRelations', 'projection', 'nodeGroups', 'namedGroupInputs', 'sharedGroupDefinitions', 'exactGeometry', 'roofTemplates', 'specialRooms', 'copycatTransforms', 'typedCopycatTransforms', 'graphDuplication', 'semanticPorts', 'immutableLibraryVersions', 'folderCopycatPicker', 'areaRaster', 'dynamicSegments', 'adaptiveRoofSegments', 'typedGraphCards', 'groupedLibraryVersions'],
 }
 writeFileSync(new URL('public/compatibility.json', import.meta.url), JSON.stringify(manifest, null, 2) + '\n')

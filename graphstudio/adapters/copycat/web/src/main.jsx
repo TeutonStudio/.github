@@ -1,3 +1,7 @@
+import { DiagramNode,NodeAppearance } from './DiagramNode.jsx'
+import { NodeDialog } from './NodeDialog.jsx'
+import { changeOperator,operatorIdentity,signature,insertionPosition } from './operators.js'
+import { OperatorChoice,OperatorFields } from './OperatorChoice.jsx'
 import { selectNodes,clickNodes } from './selection.js'
 import { groupViews,viewWires,moveViewNodes,resolveViewConnection,insertSavedReference,splitVector } from './reference-groups.js'
 import { CopycatTransforms } from './CopycatTransforms.jsx'
@@ -48,29 +52,6 @@ const examples = {
 }
 const query = new URLSearchParams(window.location.search)
 const initialMode = query.get('editor') === 'form' || query.get('graph') === 'copycat' ? 'form' : 'building'
-
-function DiagramNode({ id, data: { node, ports, groupName, outputType, hasOutput, diagnostic, reference, dynamicAxes=[], outputs=[] }, selected }) {
-  const updateInternals = useUpdateNodeInternals()
-  const signature = ports.map(port => port.id).join('|')+';'+outputs.map(output=>output.id).join('|')
-  useEffect(() => updateInternals(id), [id, signature, updateInternals])
-  const source = hasOutput ?? !['BUILDING', 'OUTPUT'].includes(node.kind)
-  return <div className={`diagram-node ${selected ? 'selected' : ''} ${diagnostic ? 'invalid' : ''} ${source ? '' : 'result-node'}`}>
-    <div className="node-heading">
-      <span className="node-symbol">{source ? portStyle(outputType).symbol : '◆'}</span>
-      <div><strong>{node.resultType ? "Ergebnis" : node.name || names[node.kind]}</strong><small>{node.resultType ? cardTypeLabel(node.resultType) : node.name ? names[node.kind] : node.id}{groupName ? ` · ${groupName}` : ''}</small></div>
-      {source && outputs.length<2 && <Handle type="source" position={Position.Right} id={outputs[0]?.id || "out"} style={{background:portStyle(outputType).color}} aria-label={`Ausgang · ${outputType}`} title={`Ausgang · ${outputType}`} />}
-    </div>
-    {outputs.length>1 && <div className="ports-output">{outputs.map(output=><div className="port" key={output.id}><span>{output.name}</span><Handle type="source" position={Position.Right} id={output.id} style={{background:portStyle(output.type).color}} title={`${output.name} · ${output.type}`} aria-label={`Ausgang ${output.name} · ${output.type}`}/></div>)}</div>}
-    {dynamicAxes.length>0 && <div className="node-reference">Dynamisch · {dynamicAxes.join(" / ")}</div>}
-    {reference && <div className="node-reference" title={`${reference.documentId}@${reference.version}`}>↗ {reference.name} · v{reference.version}</div>}
-    {diagnostic && <p className="node-diagnostic" role="alert" title={diagnostic}>⚠ {diagnostic}</p>}
-    {ports.length > 0 && <div className="ports">{ports.map(port => <div className="port" key={port.id}>
-      <Handle type="target" position={Position.Left} id={port.id} style={{background:portStyle(port.types?.[0]).color}} title={`${portName(port, node)} · ${(port.types || []).join(" / ")}`} />
-      <span>{port.name || portName(port, node)}</span>
-      <span className={`port-status ${port.source ? 'connected' : ''}`}>{port.source ? '●' : '○'}</span>
-    </div>)}</div>}
-  </div>
-}
 
 const nodeTypes = { architect: memo(DiagramNode) }
 const edgeStyle = { stroke: '#8daeb1', strokeWidth: 1.7 }
@@ -137,7 +118,9 @@ function Studio({ mode, active }) {
   const [dragging, setDragging] = useState({})
   const [message, setMessage] = useState(null)
   const [flow, setFlow] = useState(null)
-  const [kind, setKind] = useState('')
+  const [nodeDialog,setNodeDialog]=useState(false),[catalogState,setCatalogState]=useState({})
+  const [paletteGhost,setPaletteGhost]=useState(null)
+  const paletteDrag=useRef(null)
   const [workspace, setWorkspace] = useState(0)
   // React Flow measurements belong to the view, never to the Minecraft document.
   const [nodeMeasurements, setNodeMeasurements] = useState({})
@@ -163,11 +146,11 @@ function Studio({ mode, active }) {
   const nodes = useMemo(() => {
     const hidden=new Set(foldedGroups.flatMap(group=>group.nodes))
     const ordinary=entries.filter(data=>!hidden.has(data.node.id)).map(data=>({
-      id:data.node.id,type:'architect',data:{...data,reference:document.graph.nodes.find(node=>node.id===data.node.id)?.libraryReference,diagnostic:diagnostics.find(item=>item.nodeId===data.node.id)?.message,hasOutput:data.node.id!==resultNode.node.id,groupName:document.graph.nodeGroups?.find(group=>group.nodes.includes(data.node.id))?.name},position:dragging[data.node.id] || {x:data.node.x,y:data.node.y},selected:selectedIds.includes(data.node.id),measured:nodeMeasurements[data.node.id]
+      id:data.node.id,type:'architect',data:{...data,reference:document.graph.nodes.find(node=>node.id===data.node.id)?.libraryReference,onOperation:operation=>transact(()=>commit(changeOperator(mode,document,data.node.id,operation))),readOnly,diagnostic:diagnostics.find(item=>item.nodeId===data.node.id)?.message,hasOutput:data.node.id!==resultNode.node.id,groupName:document.graph.nodeGroups?.find(group=>group.nodes.includes(data.node.id))?.name},position:dragging[data.node.id] || {x:data.node.x,y:data.node.y},selected:selectedIds.includes(data.node.id),measured:nodeMeasurements[data.node.id]
     }))
     const grouped=foldedGroups.map(group=>({id:group.id,type:'architect',position:dragging[group.id] || group.position,selected:selectedIds.includes(group.id),measured:nodeMeasurements[group.id],data:{node:{id:group.id,kind:group.presentation==='vectorSplit'?'VECTOR_SPLIT':'REFERENCE',name:group.name},ports:group.ports.map(port=>({...port,name:port.name || portName({...port,id:port.targetPort},entries.find(e=>e.node.id===port.targetNode).node)})),outputs:group.outputs,outputType:group.outputs[0]?.type,hasOutput:group.outputs.length>0,reference:group.libraryReference,diagnostic:diagnostics.find(item=>group.nodes.includes(item.nodeId))?.message}}))
     return [...ordinary,...grouped]
-  },[entries,document,foldedGroups,dragging,selectedIds,nodeMeasurements,diagnostics])
+  },[entries,document,foldedGroups,dragging,selectedIds,nodeMeasurements,diagnostics,readOnly])
   const onNodesChange = useCallback(changes => {
     if(changes.some(change=>change.type==='select')) setSelectedIds(previous=>selectNodes(previous,changes))
     const measured = changes.filter(change => change.type === 'dimensions' && change.dimensions)
@@ -251,21 +234,51 @@ function Studio({ mode, active }) {
     setNodeMeasurements({})
     setWorkspace(key => key + 1)
   }
-  const add = () => transact(() => {
-    if (!kind) return
-    if(mode==='building' && kind==='COPYCAT') {setReferenceTarget(null);setReferenceDialog(true);return}
-    const { left, top, width, height } = canvas.current.getBoundingClientRect()
-    const center = flow?.screenToFlowPosition({ x: left + width * 0.5, y: top + height * 0.4 }) ?? { x: 50, y: 50 }
-    if(kind==='POSITION_X') {const result=splitVector(mode,document,null,{x:position(center.x),y:position(center.y)});commit(result.document);setSelected(result.nodeId);setSelectedIds([result.nodeId]);return}
-    const id = `node_${crypto.randomUUID().slice(0, 13)}`
-    const node = newNode(mode === 'building', kind, id, position(center.x), position(center.y), true)
-    if (kind === 'INPUT') node.part.group = formGroups(document)[0].id
-    commit(replaceNodes(document, [...document.graph.nodes, node]))
-    setSelected(id)
-    if(kind==='AREA') setPreviewMode('selected')
-    setSelectedIds([id])
-    setSelectedWire(null)
+  const addDraft = (draft,location=null) => transact(() => {
+    if(readOnly || entries.length>=maxNodes) return
+    if(['INPUT','SAVED'].includes(draft.kind) && entries.filter(({node})=>['INPUT','SAVED'].includes(node.kind)).length>=model.formSources) throw new Error('Maximale Anzahl an Copycat-Quellen erreicht.')
+    const {left,top,width,height}=canvas.current.getBoundingClientRect()
+    const point=location || flow?.screenToFlowPosition({x:left+width*.5,y:top+height*.4}) || {x:50,y:50}
+    if(draft.kind==='POSITION_X') {
+      const result=splitVector(mode,document,null,{x:position(point.x),y:position(point.y)})
+      commit(result.document);setSelected(result.nodeId);setSelectedIds([result.nodeId]);setNodeDialog(false);return
+    }
+    const id=`node_${crypto.randomUUID().slice(0,13)}`
+    const node={...structuredClone(draft),id,x:position(point.x),y:position(point.y)}
+    if(node.kind==='INPUT') node.part.group=formGroups(document)[0].id
+    const candidate={...document,graph:{...document.graph,schema:Math.max(document.graph.schema,operatorIdentity(node)?mode==='building'?9:6:document.graph.schema)}}
+    commit(replaceNodes(candidate,[...document.graph.nodes,node]))
+    setSelected(id);setSelectedIds([id]);setSelectedWire(null);setNodeDialog(false)
+    if(node.kind==='AREA')setPreviewMode('selected')
   })
+  const startPaletteDrag=(event,node,entry)=>{
+    if(event.button!==0 || readOnly || entries.length>=maxNodes || event.target.closest('select,input,button'))return
+    event.preventDefault()
+    const rect=event.currentTarget.getBoundingClientRect()
+    paletteDrag.current={pointer:event.pointerId,node,entry,start:{x:event.clientX,y:event.clientY},grip:{x:event.clientX-rect.left,y:event.clientY-rect.top},started:false}
+  }
+  useEffect(()=>{
+    const move=event=>{
+      const drag=paletteDrag.current;if(!drag || drag.pointer!==event.pointerId)return
+      if(!drag.started && Math.hypot(event.clientX-drag.start.x,event.clientY-drag.start.y)<4)return
+      drag.started=true;setNodeDialog(false)
+      const zoom=flow?.getZoom() || 1
+      setPaletteGhost({...drag.entry,x:event.clientX-drag.grip.x*zoom,y:event.clientY-drag.grip.y*zoom,zoom})
+    }
+    const cancel=()=>{if(paletteDrag.current?.started)setNodeDialog(true);paletteDrag.current=null;setPaletteGhost(null)}
+    const up=event=>{
+      const drag=paletteDrag.current;if(!drag || event.pointerId!==drag.pointer)return
+      paletteDrag.current=null;setPaletteGhost(null)
+      if(!drag.started)return
+      const rect=canvas.current?.getBoundingClientRect()
+      if(flow && rect && event.clientX>=rect.left && event.clientX<=rect.right && event.clientY>=rect.top && event.clientY<=rect.bottom) {
+        addDraft(drag.node,insertionPosition({x:event.clientX,y:event.clientY},drag.grip,flow))
+      } else setNodeDialog(true)
+    }
+    const key=event=>{if(event.key==='Escape' && paletteDrag.current){event.preventDefault();event.stopImmediatePropagation();cancel()}}
+    window.addEventListener('pointermove',move);window.addEventListener('pointerup',up);window.addEventListener('pointercancel',cancel);window.addEventListener('blur',cancel);window.addEventListener('keydown',key,true)
+    return ()=>{window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',up);window.removeEventListener('pointercancel',cancel);window.removeEventListener('blur',cancel);window.removeEventListener('keydown',key,true)}
+  },[flow,document,readOnly,entries.length])
   const onDrag = useCallback((_, node, moved) => setDragging(Object.fromEntries((moved?.length ? moved : [node]).map(item=>[item.id,item.position]))), [])
   const onDragStop = (_, node, moved) => {
     const positions=moveViewNodes(document,foldedGroups,moved?.length?moved:[node])
@@ -328,9 +341,8 @@ function Studio({ mode, active }) {
   }
   const count = entries.length
   const maxNodes = mode === 'form' ? model.formNodes : model.buildingNodes
-  const portLimits = mode === 'form' ? model.form.find(type => type.kind === visibleNode.node.kind)
-    : model.buildingInputs[visibleNode.node.kind] ?? null
-  const isFormSourceLimit = ['INPUT', 'SAVED'].includes(kind) && entries.filter(({ node }) => ['INPUT', 'SAVED'].includes(node.kind)).length >= model.formSources
+  const portLimits = signature(visibleNode.node) || (mode === 'form' ? model.form.find(type => type.kind === visibleNode.node.kind)
+    : model.buildingInputs[visibleNode.node.kind] ?? null)
   const previewSelected = current?.node.id ?? ''
   const areaTarget=previewMode==='selected' ? current?.node.kind==='AREA'?current.node.id:current?.node.resultType==='AREA'?current.node.inputs[0]:null : cardResult(document).resultType==='AREA'?cardResult(document).inputs[0]:null
   const areaPreviewNode=entries.find(entry=>entry.node.id===areaTarget)?.node
@@ -422,11 +434,13 @@ function Studio({ mode, active }) {
   }
   useEffect(() => {
     if(!active) return
-    const handler=event=>{if(window.document.querySelector('dialog[open],.library-overlay,[role="dialog"]')) return;keydown(event)}
+    const handler=event=>{if(paletteDrag.current || window.document.querySelector('dialog[open],.library-overlay,[role="dialog"]')) return;keydown(event)}
     window.addEventListener('keydown',handler)
     return ()=>window.removeEventListener('keydown',handler)
   },[active,keydown])
   return <div className="studio" hidden={!active}>
+    {nodeDialog && <NodeDialog {...{mode,document,kinds,count,maxNodes}} onAdd={addDraft} onClose={()=>setNodeDialog(false)} onGrab={startPaletteDrag} state={catalogState} setState={setCatalogState}/>}
+    {paletteGhost && <div className="palette-ghost" style={{left:paletteGhost.x,top:paletteGhost.y,transform:`scale(${paletteGhost.zoom})`}}><NodeAppearance preview data={{...paletteGhost,hasOutput:true,readOnly:true}}/></div>}
     {referenceDialog && <FileDialog mode={mode} library={library} referenceOnly referenceTargetId={referenceTarget} currentIdentity={fileIdentity} readOnly={readOnly} onChoose={insertReference} onReference={insertReference} onClose={()=>setReferenceDialog(false)} actions={!foldedGroups.some(group=>group.id===referenceTarget) && <button onClick={()=>{setReferenceDialog(false);chooseCopycat(referenceTarget,true)}}>Grundform wählen …</button>} />}
     {fileDialog && <FileDialog mode={mode} library={library} currentIdentity={fileIdentity} readOnly={readOnly} onChoose={openEntry} onReference={insertReference} onClose={() => setFileDialog(false)} actions={<>    <div className="toolbar">
       <label className="example-select"><span>BEISPIELE</span><select aria-label="Beispiel öffnen" value="" onChange={e => transact(() => open(examples[mode][Number(e.target.value)][1]))}>
@@ -480,11 +494,7 @@ function Studio({ mode, active }) {
             <small>{count} / {maxNodes}{readOnly ? ' · Betrachten' : ''}</small>
           </div>
           <div className="button-row">
-            <select disabled={readOnly} aria-label="Knotentyp" value={kind} onChange={event => setKind(event.target.value)}>
-              <option value="" disabled>Knotentyp</option>
-              {kinds.map(kind => <option key={kind} value={kind}>{kind==='POSITION_X'?'Position zerlegen':kind==='POSITION'?'Position zusammenführen (hB)':names[kind]}</option>)}
-            </select>
-            <button type="button" disabled={readOnly || !kind || count >= maxNodes || isFormSourceLimit} onClick={add}>+ Knoten</button>
+            <button type="button" disabled={readOnly || count>=maxNodes} onClick={()=>setNodeDialog(true)}>+ Knoten hinzufügen</button>
           </div>
         </div>
         <div className="canvas" ref={canvas}>
@@ -550,10 +560,11 @@ function Studio({ mode, active }) {
                   })}>Letzten Eingang entfernen</button>
               </div>}
             </details>}
-            <NodeFields {...{ mode, node: visibleNode.node, document, edit: patchNode, library }}
+            {operatorIdentity(visibleNode.node) && <><OperatorChoice node={visibleNode.node} disabled={readOnly} onChange={operation=>transact(()=>commit(changeOperator(mode,document,visibleNode.node.id,operation)))}/><OperatorFields roles={Object.keys(document.palette || {})} node={visibleNode.node} edit={patchNode}/></>}
+            {!operatorIdentity(visibleNode.node) && <NodeFields {...{ mode, node: visibleNode.node, document, edit: patchNode, library }}
               onInspectNode={id => { setSelected(id); setSelectedIds([id]); setSelectedWire(null) }}
               onChooseCopycat={() => chooseCopycat(visibleNode.node.id)}
-              onImportCopycat={() => copycatInput.current.click()} />
+              onImportCopycat={() => copycatInput.current.click()} />}
             {(selectedWire || current && !protectedNode(current.node,document)) &&
               <button className="danger" type="button" onClick={removeSelection}>{selectedWire ? 'Verbindung trennen' : 'Knoten löschen'}</button>}
             {visibleNode && !visibleNode.node.resultType && (visibleNode.outputType === 'shape' || visibleNode.outputType?.startsWith('COPYCAT') || ['ROTATION','MIRRORING','POSITION'].includes(visibleNode.node.kind)) && <CopycatTransforms node={visibleNode.node} edit={patchNode} primary />}
