@@ -1,3 +1,4 @@
+import { model } from './model.js'
 export const nodeCategories = [
   ['sources', 'Quellen und Referenzen', 'Grundformen oder gespeicherte Inhalte als Ausgangspunkt verwenden.'],
   ['copycat', 'Copycats bearbeiten', 'Formen kombinieren, voneinander abziehen oder ausrichten.'],
@@ -20,7 +21,7 @@ const descriptions = {
   TRANSFORMATION:'Spiegelung, Rotation und Position zu einem Transformation-Wert bündeln. Reihenfolge im Inspektor wählbar; Standard: Spiegeln → Rotieren → Positionieren (SRP).',
   COPYCAT_TRANSFORM:'Einen Copycat mit dem angeschlossenen Transformation-Wert spiegeln, rotieren und positionieren. Ohne Wert bleibt er unverändert.',
   SEGMENT_TRANSFORM:'Ein Segment mit dem angeschlossenen Transformation-Wert spiegeln, rotieren und positionieren. Positionen in hB; 16 hB entsprechen einem Block.',
-  COPYCAT: 'Eine genaue Version aus der Bibliothek als Referenz einsetzen. Im nächsten Dialog kannst du auch eine Grundform wählen.',
+  COPYCAT: 'Eine Grundform oder gespeicherte Version als Copycat-Quelle verwenden. Nach dem Einfügen lässt sich die Quelle im Inspektor auswählen.',
   INPUT: 'Eine Copycat-Grundform erzeugen. Form, Größe und Ausrichtung stellst du im Inspektor ein.',
   SAVED: 'Eine gespeicherte Copycat-Form mit ihren Materialgruppen als Quelle verwenden.',
   SEGMENT: 'Copycats zu einem Wandsegment zusammensetzen oder entlang seiner Achsen wiederholen.',
@@ -62,6 +63,7 @@ const operations = {
 }
 const calculations = {ADD:'addieren',SUBTRACT:'voneinander abziehen',MULTIPLY:'multiplizieren',DIVIDE:'dividieren',MIN:'auf den kleineren Wert begrenzen',MAX:'auf den größeren Wert begrenzen'}
 export function describeCatalogNode(kind) {
+  if(model.operators?.[kind]) return model.operators[kind].description
   if (descriptions[kind]) return descriptions[kind]
   const calculation = kind.match(/^(INT|POSITION)_(ADD|SUBTRACT|MULTIPLY|DIVIDE|MIN|MAX)$/)
   if(calculation) return `${['ADD','MULTIPLY','MIN','MAX'].includes(calculation[2]) ? 'Zwei bis sechzehn' : 'Zwei'} ${calculation[1] === 'INT' ? 'ganze Zahlen' : 'Positionen komponentenweise'} ${calculations[calculation[2]]}. Das Ergebnis lässt sich mit weiteren Knoten verbinden.`
@@ -73,7 +75,7 @@ export function describeCatalogNode(kind) {
 export function categoryOfNode(kind = '') {
   if(['COPYCAT','INPUT','SAVED','REFERENCE'].includes(kind)) return 'sources'
   if(['GARDEN','PATH'].includes(kind)) return 'landscape'
-  if(/^(INT|POSITION)(_|$)/.test(kind) || ['ROTATION','MIRRORING','TRANSFORMATION','VECTOR_SPLIT'].includes(kind)) return 'values'
+  if(/^(INT|POSITION)(_|$)/.test(kind) || ['ROTATION','MIRRORING','TRANSFORMATION','VECTOR_SPLIT','NUMBER_OPERATOR','RELATION_OPERATOR','STATEMENT_OPERATOR'].includes(kind)) return 'values'
   if(['AREA','SEGMENT_LAYOUT','ROOM_GEOMETRY','ROOM_LAYOUT','ROOF_LAYOUT'].includes(kind)) return 'layouts'
   if(kind.startsWith('SEGMENT_') || ['SEGMENT','PATTERN','ROTATION_SEGMENT'].includes(kind)) return 'segments'
   if(kind.startsWith('COPYCAT_') || ['UNION','INTERSECTION','DIFFERENCE','SYMMETRIC_DIFFERENCE','ROTATE','MIRROR','TRANSLATE'].includes(kind)) return 'copycat'

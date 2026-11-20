@@ -5,7 +5,7 @@ parser=argparse.ArgumentParser();parser.add_argument('--url',default='http://127
 fixture=Path(__file__).resolve().parents[2]/'examples/building-graph-assembly.json'
 doc=json.loads(fixture.read_text());doc['name']='Segmentraster-Prüfung';doc['graph']['schema']=11;doc['palette']={'wall':'minecraft:stone','roof':'minecraft:deepslate_tiles','gable':'minecraft:oak_planks','frame':'minecraft:oak_planks','glass':'minecraft:glass','trim':'minecraft:stone_bricks'}
 base={'kind':'SEGMENT','module':'','form':'full@1','assembly':False,'length':3,'height':2,'depth':1,'x':100,'y':-250}
-doc['graph']['nodes'] += [{**base,'id':'operand_a','name':'Segment A'}, {**base,'id':'operand_b','name':'Segment B','length':2,'x':450}, {'id':'op','kind':'SEGMENT_INTERSECTION','name':'Schnitt prüfen','inputs':['operand_a','operand_b'],'operandOffsets':[{'x':0,'y':0,'z':0},{'x':2,'y':0,'z':0}],'x':800,'y':-250}]
+doc['graph']['nodes'] += [{**base,'id':'operand_a','name':'Segment A'}, {**base,'id':'operand_b','name':'Segment B','length':2,'x':450}, {'id':'op','kind':'SEGMENT_OPERATOR','operation':'INTERSECTION','name':'Schnitt prüfen','inputs':['operand_a','operand_b'],'operandOffsets':[{'x':0,'y':0,'z':0},{'x':2,'y':0,'z':0}],'x':800,'y':-250}]
 with sync_playwright() as p:
  browser=p.chromium.launch(executable_path='/usr/bin/chromium-browser',headless=True,args=['--no-sandbox','--enable-unsafe-swiftshader'])
  context=browser.new_context(viewport={'width':1440,'height':1000});page=context.new_page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)));page.set_default_timeout(20000)
@@ -95,7 +95,7 @@ with sync_playwright() as p:
  for old_name in ('Segmentanordnung auswählen','Raumgrundriss auswählen','Dachebene auswählen','Dachanordnung auswählen'):
   expect(picker.get_by_role('button',name=old_name,exact=True)).to_have_count(0)
  picker.get_by_role('searchbox').fill('Dach')
- picker.get_by_role('button',name='Dach auswählen',exact=True).click()
+ picker.get_by_role('article',name='Vorschau · Dach',exact=True).click()
  picker.get_by_role('button',name='Ausgewählten Knoten in Kartenmitte einfügen',exact=True).click()
  expect(page.locator('[data-inspector-field="roofSections"]')).to_be_visible()
  assert next(n for n in export()['graph']['nodes'] if n.get('roofSections'))['roofSections'][0]['id']=='section_1'

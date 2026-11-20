@@ -27,7 +27,7 @@ const labels = {
   fenced: 'Einfrieden', fenceBlock: 'Zaunblock', fenceHeight: 'Zaunhöhe', pathWidth: 'Wegbreite',
   groundDepth: 'Bodentiefe', groundBlock: 'Bodenblock', clearance: 'Freiraum', elevation: 'Höhenversatz',
   landscapeOffset: 'Geländeversatz', buildingOffset: 'Gebäudeversatz', sitePaths: 'Wegeverläufe',
-  top: 'Oben', rise: 'Anstieg', run: 'Lauflänge', phase: 'Phase', slice: 'Periodenschnitt', variant: 'Dachvariante', projection: 'Position am Architektentisch', table: 'Tischposition', turn: 'Drehung', exact: 'Exakte Geometrie',
+  discCut: 'Scheibenanteil', top: 'Oben', rise: 'Anstieg', run: 'Lauflänge', phase: 'Phase', slice: 'Periodenschnitt', variant: 'Dachvariante', projection: 'Position am Architektentisch', table: 'Tischposition', turn: 'Drehung', exact: 'Exakte Geometrie',
   exactClip: 'Exakter Ausschnitt', roof: 'Dachgeometrie', x: 'X', y: 'Y', z: 'Z', width: 'Breite', height: 'Höhe',
   length: 'Länge', position: 'Position', sourceIndex: 'Eingang', quarterTurns: 'Vierteldrehungen',
   instances: 'Instanzen', boundary: 'Umriss', boundaryRules: 'Randregeln', filler: 'Füllsegment',

@@ -25,3 +25,21 @@ export function rasterLine(from,to) {
   const steps=Math.max(Math.abs(to.x-from.x),Math.abs(to.z-from.z))
   return Array.from({length:steps+1},(_,i)=>({x:Math.round(from.x+(to.x-from.x)*i/(steps || 1)),z:Math.round(from.z+(to.z-from.z)*i/(steps || 1))}))
 }
+
+
+export const areaTools=[['PAINT','Malen'],['RECTANGLE','Rechteck ziehen'],['SQUARE','Quadrat ziehen']]
+// Include both endpoints and retain a square in every drag direction, including
+// at the coordinate boundary. No partial shape is returned past the cell limit.
+export function rasterRectangle(from,to,square=false) {
+  if(![from.x,from.z,to.x,to.z].every(Number.isInteger)) throw new Error('Rasterpunkte müssen ganzzahlig sein.')
+  const clamp=value=>Math.max(-128,Math.min(127,value))
+  const start={x:clamp(from.x),z:clamp(from.z)},end={x:clamp(to.x),z:clamp(to.z)}
+  if(square) {
+    const dx=Math.sign(end.x-start.x) || 1,dz=Math.sign(end.z-start.z) || 1
+    const side=Math.min(Math.max(Math.abs(end.x-start.x),Math.abs(end.z-start.z))+1,dx>0?128-start.x:start.x+129,dz>0?128-start.z:start.z+129)
+    end.x=start.x+dx*(side-1);end.z=start.z+dz*(side-1)
+  }
+  const minX=Math.min(start.x,end.x),minZ=Math.min(start.z,end.z),width=Math.abs(end.x-start.x)+1,depth=Math.abs(end.z-start.z)+1
+  if(width*depth>16384)throw new Error('Eine Fläche darf höchstens 16384 Zellen enthalten.')
+  return Array.from({length:width*depth},(_,i)=>({x:minX+i%width,z:minZ+Math.floor(i/width)}))
+}

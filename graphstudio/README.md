@@ -23,6 +23,12 @@ Vorschau: `http://127.0.0.1:4317/`. Der Copycat-Adapter liegt unter `copycat/`
 und verwendet `?editor=graph`; alte Form-/Gebäudelinks öffnen denselben Graphen. Das Prüfmanifest steht
 unter `studio.json`, der Fachkernvertrag unter `copycat/compatibility.json`.
 
+Die Grundformenauswahl übernimmt alle 21 Einträge aus dem nativen Katalog,
+inklusive Dach, halber Scheibe und Viertelscheibe. „Grundform wählen …“ öffnet
+auch beim Ersetzen einer gespeicherten Referenz direkt die Grundformen.
+Dachgeometrie und Scheibenanteil sind auch bei Grundformen im Referenzknoten
+bearbeitbar; die gewählte Variante bleibt beim Speichern und Laden erhalten.
+
 `sources.lock.json` legt den öffentlichen Modquellstand fest. Der Build lädt ihn
 in `.cache`, kopiert den organisationsseitigen Webcode darüber und führt die
 Modtests, Browsertests und den JVM-Rückimport aus. Erst dann entsteht `dist`.
@@ -58,8 +64,8 @@ Vorschau: `http://127.0.0.1:4318/`. Sie bindet nur an Loopback.
 
 Transformationen benötigen Formgraphschema 4 bzw. Gebäudegraphschema 5; Vektorrechnung und der aneinanderliegende Säulenmodus benötigen Schema 5 bzw. 6.
 `sources.lock.json` pinnt den veröffentlichten Fachkerncommit
-[`629531f`](https://github.com/TeutonStudio/Copycat-Architecture/commit/629531f65a272476c42ad696405f75ebf06e1e84)
-auf Basis 0.6.4, Branch `codex/area-grid-dynamic-segments`. Der neuere Mod-Hauptzweig
+[`e583178`](https://github.com/TeutonStudio/Copycat-Architecture/commit/e5831781f92985e65557f91be63c651d6955ce6c)
+auf Basis 0.6.4, Branch `codex/graphstudio-direct-area-authoring`. Der neuere Mod-Hauptzweig
 und vorhandene Release-JARs werden dadurch nicht ersetzt. Der öffentliche Build
 prüft weiterhin saubere, gepinnte Quellen und den Mindestvertrag in
 `adapters/copycat/core-contract.json`.
@@ -101,6 +107,12 @@ Dachformen an den tatsächlich gerenderten Dreiecken: Volumen, freie Sicht durch
 den Ausschnitt, Materialgruppen, Gebäudewiederholungen, leere Ergebnisse und
 unveränderte Rasterformen.
 
+Auch Drehungen direkt am Referenzknoten erhalten diese Ausschnitte und ihre
+Materialgruppen. Der Fachkern hält temporäre Transformationsergebnisse als
+gültige gespeicherte Quellgraphen. `reference-rotation.test.js` prüft Raster-
+und exakte Dach-XOR-Ausschnitte um X/Y/Z mit 90°, 180° und 270°, JSON-Rundlauf
+und anschließende Drehungen in Segmenten.
+
 ## Graphkarten, Rasterflächen und dynamische Segmente
 
 Ein Graph enthält alle nativen Knotenfamilien. Der Ergebnisknoten bestimmt den
@@ -113,6 +125,25 @@ Flächen: Quadrat, Rechteck oder direkt im 2D-Raster zeichnen. Dynamische
 Segmentachsen werden erst am Raum/Dach aufgelöst. Neue Dachknoten bieten fünf
 Vorlagenanschlüsse und ermitteln deren Anwendungsstellen automatisch.
 Flächen/Dynamik benötigen Gebäudegraphschema 7, gemeinsame Karten Schema 8.
+
+
+## Flächenwerkzeuge und Spiegelachsenraster
+
+Im Fläche-Knoten steht unter **Bedienung** die Auswahl **Malen**, **Rechteck ziehen**
+und **Quadrat ziehen**. Ein Werkzeug übernimmt eine bisher über Anzahlen definierte
+Fläche in das freie Raster. Rechteck und Quadrat zeigen beim Ziehen eine Vorschau;
+ein Loslassen übernimmt den ganzen Strich als einen rückgängig machbaren Schritt.
+Alt entfernt den gezogenen Bereich, Escape verwirft den Strich. Verkleinern einer
+Vorschau hinterlässt keine vorher überstrichenen Zellen. Die Begrenzung auf 16384
+Zellen und X/Z von −128 bis 127 bleibt erhalten; Überschreitungen verändern die
+vorherige Fläche nicht. Die bestehenden Flächenformen und Anzahlanschlüsse bleiben
+für die parametrische Eingabe verfügbar.
+
+Die Spiegelachsenauswahl belegt die gesamte verfügbare Zeilenbreite und passt ihre
+Rasterspalten an den Inspektor an. Reihenfolgeknöpfe stehen unter der Auswahl.
+Kacheln zeigen die Ebene und ihre Achsenbezeichnung; die aktive Kachel wird markiert.
+Pfeiltasten navigieren innerhalb des aktuellen Rasters, Home/End zur ersten/letzten
+Ebene. Auch die Spiegeloperation in einer Operatorfamilie verwendet diese Auswahl.
 
 ## Direkte Flächen und Segmentanordnung
 
@@ -145,9 +176,8 @@ zum Vergleichen. Die vorhandene Musteranordnung nutzt denselben Bereich.
 Die neuen direkten Verbindungen, eingebetteten Dachflächen und relativen
 Segmentversätze verwenden Gebäudegraphschema 11. Bestehende DTO-Felder und die
 Auswertung älterer Graphen bleiben erhalten. Der Browser verwendet dafür den
-kanonischen Kotlin-Fachkern. Diese Funktionen stehen im lokalen Alpha-Build
-mit dem passenden Entwicklungskern bereit; `sources.lock.json` bleibt beim
-bisherigen öffentlichen Stand.
+kanonischen Kotlin-Fachkern. Der öffentliche Build pinnt dafür den geprüften
+Quellstand in `sources.lock.json`; ältere gespeicherte Graphen bleiben nutzbar.
 
 Die [Abnahme vom 20. November 2026](reports/graphstudio-authoring-2026-11-20.md)
 enthält Prüfbefehle, Ergebnisse und Ansichten.

@@ -4,6 +4,7 @@ import {readFileSync} from 'node:fs'
 import {newNode,previewGraph,arrangementGraph,starterBuilding,authoringBuildingNode,remapBuildingReferences,graphModels} from '../src/generated/engine.mjs'
 import {applyWires,connections,editNode,inspect,readGraph,replaceNodes,writeGraph,editInputs} from '../src/model.js'
 import {switchOperator} from '../src/operator-families.js'
+import {changeOperator} from '../src/operators.js'
 const test=(name,run)=>nodeTest(name,{skip:!graphModels().directAreas},run)
 const fixture=name=>JSON.parse(readFileSync(new URL(`../../examples/${name}.json`,import.meta.url)))
 const library=fixture('library'),base=()=>fixture('building-graph-assembly')
@@ -126,4 +127,20 @@ test('switching a legacy union with vertical positions retains those positions i
  assert.deepEqual(next.graph.nodes.find(n=>n.id==='op').operandOffsets,op.offsets)
  assert.deepEqual(next.graph.nodes.find(n=>n.id==='op').offsets,[])
  assert.equal(plan(next,'op').count,1)
+})
+
+for(const [operation,count] of [['UNION',8],['INTERSECTION',2],['DIFFERENCE',4],['SYMMETRIC_DIFFERENCE',6]]) test(`published ${operation} family shares the relative operand raster`,()=>{
+ const a={...n('SEGMENT','a'),assembly:false,module:'',form:'full@1',length:3,height:2,depth:1}
+ const b={...a,id:'b',length:2}
+ const op={...n('SEGMENT_OPERATOR','op'),operation,inputs:['a','b'],operandOffsets:[{x:-3,y:-2,z:1},{x:-1,y:-2,z:1}]}
+ const d=documentWith(a,b,op)
+ assert.equal(plan(d,'op').count,count)
+ const grid=arrangementGraph(d,library,'op','Y');assert.equal(grid.editable,true)
+ assert.deepEqual(grid.items.map(i=>i.offset),op.operandOffsets)
+ const switched=changeOperator('building',d,'op','DIFFERENCE')
+ assert.deepEqual(switched.graph.nodes.find(n=>n.id==='op').operandOffsets,op.operandOffsets)
+ if(operation!=='DIFFERENCE') assert.deepEqual(editInputs('building',d,'op',[1,0]).graph.nodes.find(n=>n.id==='op').operandOffsets,[op.operandOffsets[1],op.operandOffsets[0]])
+ const unary=changeOperator('building',d,'op','ROTATE')
+ assert.equal(unary.graph.nodes.find(n=>n.id==='op').operandOffsets,null)
+ assert.equal(arrangementGraph(unary,library,'op','Y').editable,false)
 })

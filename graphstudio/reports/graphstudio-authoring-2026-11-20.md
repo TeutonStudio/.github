@@ -1,88 +1,75 @@
-# Graphstudio: Bedienung, direkte Flächen und relative Segmentpositionen
+# Graphstudio: direkte Flächen und relative Segmentpositionen
 
-Stand: 20. November 2026. Lokal gebaut und geprüft; keine Veröffentlichung.
+Abnahme: 20. November 2026. Der öffentliche Build verwendet den gepinnten
+[Kotlin-Fachkern e583178](https://github.com/TeutonStudio/Copycat-Architecture/commit/e5831781f92985e65557f91be63c651d6955ce6c).
+Er enthält auch die bereits veröffentlichten Operatorfamilien und Spiegelwerte.
 
-## Umsetzung
+## Bedienung
 
-- Graphkopf: Rückgängig, Wiederholen und Löschen einschließlich Mehrfachauswahl und Verbindungstrennung.
-- Gemeinsamer Materialdialog: Blockitem-Miniaturen, Suche, Zustände, Übernehmen/Abbrechen und Tastaturfokus. Paletten übernehmen weiterhin nur die Block-ID; Copycat-Materialgruppen können Zustände speichern.
-- Direkte Flächeneingänge an Segmenten und Räumen; Höhe/Tiefe am Verbraucher. Neue Dächer enthalten eigene Dachflächen mit stabilen Anschlüssen, Geschossbindung und Gauben. Die vier bisherigen Umwandler bleiben für gespeicherte Graphen unterstützt und werden bei neuen Knoten ausgeblendet.
-- Eigene 2D-Sektion neben 3D und Inspektor: orthografische Ebenen, sichtbarer Ursprung und ganzzahlige unabhängige Eingangsversätze für die vier booleschen Segmentoperatoren. Änderungen erscheinen unmittelbar in 3D; Übernehmen erzeugt einen Undo-Schritt. Unäre Segmentoperationen zeigen Quelle und Ergebnis.
-- Optionale neue Felder `operandOffsets` und `roofSections` in Gebäudegraphschema 11; Geometrie und Validierung kommen aus demselben Kotlin-Fachkern für JVM und Browser.
+- Rückgängig, Wiederholen und Löschen stehen im Graphkopf. Löschen berücksichtigt Mehrfachauswahl und gewählte Verbindungen.
+- Materialgruppen und Gebäudepalette verwenden einen Dialog mit Blockitem-Miniaturen, Suche, Zuständen und Übernehmen/Abbrechen. Die direkte Material-ID-Eingabe bleibt erhalten. Paletten speichern weiterhin nur die Block-ID; Copycat-Materialgruppen können Zustände speichern.
+- Segmente und Räume nehmen Flächen direkt an; Tiefe beziehungsweise Höhe liegen am Verbraucher. Dächer enthalten bis zu 16 eigene Dachflächen mit stabilen Anschlüssen, Geschossbindung und Gauben. Die vier bisherigen Umwandler bleiben für bestehende Graphen unterstützt und werden bei neuen Knoten ausgeblendet.
+- Ein eigener 2D-Bereich ergänzt 3D und Inspektor. Die drei Bereiche sind unabhängig einklappbar und in der Höhe veränderbar. Die vier booleschen Segmentoperationen erlauben unabhängig pro Eingang ganzzahlige X-/Y-/Z-Positionen. Das gilt für die veröffentlichten Operatorfamilien und die bisherigen Einzelknoten.
+- Ziehen, Pfeiltasten und Koordinatenfelder ändern einen Entwurf mit unmittelbarer 3D-Vorschau. Übernehmen erzeugt einen Undo-Schritt; Verwerfen verwirft ihn. Unäre Segmentoperationen zeigen Quelle und Ergebnis. Beim Umsortieren, mehrfacher Verwendung derselben Quelle und Wechsel zwischen booleschen Operationen bleiben die zugehörigen Positionen erhalten.
+- Die optionalen Felder `operandOffsets` und `roofSections` verwenden Gebäudegraphschema 11. JVM und Browser verwenden dieselbe Geometrie und Validierung.
 
-## Abnahme
+## Prüfung vor der Veröffentlichung
 
 | Prüfung | Ergebnis |
 | --- | --- |
-| Kanonischer Kotlin-Fachkern | 55 Tests erfolgreich, keine Fehler oder übersprungenen Fälle |
-| Vollständige Copycat-Browser-Testsuite | 33 Testdateien erfolgreich, keine Fehler oder übersprungenen Dateien |
-| JVM → Browser → JVM | 28 Fälle mit identischen DTOs und Geometrie; abschließender JVM-Rückimport erfolgreich |
-| Organisationsvertrag und Alpha-Modell (`npm test`) | 9 Tests erfolgreich |
-| Tatsächlicher Alpha-Produktionsbuild | erfolgreich; erzeugte UI mit Chromium geprüft |
-| Browserbedienung | Löschen/Undo/Redo, 2D-Entwurf, leeres Schnittergebnis, Verwerfen/Übernehmen, Materialdialog, Palette, Fokus/Escape, neue Dachflächen und ausgeblendete Umwandler erfolgreich |
-| Layout | Desktop 1440×1000, Tablet 820×1180 und Mobil 390×844 |
+| Vollständiger nativer Mod-Testlauf | 644 Fälle: 640 bestanden, keine Fehler, 4 optionale Dateiprüfungen zunächst übersprungen |
+| Vollständige Browser-Testsuite | 38 Testdateien bestanden; keine Fehler oder übersprungenen Dateien |
+| JVM → Browser → JVM | 32 Fälle mit identischen DTOs und Geometrie, einschließlich aller vier Positionierungsoperationen in beiden Knotenformaten |
+| Öffentlicher Buildvertrag (`npm test`) | 3 Tests bestanden |
+| Browser-Produktionsbuild | erfolgreich gebaut und mit Chromium geprüft |
+| Browserbedienung | Löschen/Undo/Redo, Live-Anordnung einschließlich leerem Schnittergebnis, Verwerfen/Übernehmen, Materialdialog, Fokus/Escape, neue Dachflächen und ausgeblendete Umwandler bestanden |
+| Bildschirmgrößen | Desktop 1440×1000, Tablet 820×1180, Mobil 390×844 |
 
-Der vollständige native Mod-Testlauf wird im vorhandenen Entwicklungsstand
-bereits beim Kompilieren der Minecraft-Oberfläche durch unvollständige
-`when`-Zweige für die neuen Transformationstypen blockiert
-(`BuildingGraphCanvas.kt`, `BuildingInsertionCategories.kt`,
-`NodeGraphCanvas.kt`). Der isolierte Lauf baut und prüft den tatsächlichen
-Fachkern mit den erforderlichen Projektionen; er verwendet keine nachgebildete
-Geometrie. Die hier genannten 55 Tests sind deshalb kein vollständiger
-Minecraft-Mod-Build. Der Alpha-Build meldet außerdem bereits vorhandene
-Hinweise zu doppelten Beschriftungsschlüsseln und Bundlegrößen.
+Der Pflichtfall `GraphstudioExchangeTest.browserExports` wird nach dem
+Browserexport separat ausgeführt und muss ohne Überspringen bestehen. Die
+übrigen optionalen Fälle betreffen zwei nicht mitgelieferte gespeicherte
+Nutzervorlagen und den Vergleich mit einer zweiten lokalen Mod-Arbeitskopie.
+Sie sind keine Voraussetzung des öffentlichen Builds.
+
+Die zuvor unvollständigen nativen Transformationsfälle sind ergänzt: Alle
+neuen Typen kompilieren auch in der Minecraft-Oberfläche. Transformationswerte
+besitzen dort einen transaktionalen Einstellungsdialog. Eine Ingame-Abnahme
+ist damit nicht verbunden. Bestehende Buildhinweise zu Beschriftungsschlüsseln
+und Bundlegrößen bleiben bestehen.
 
 ## Wiederholen
 
-Java 21 und die vorhandenen Gradle-/npm-Abhängigkeiten werden benötigt.
-Aus dem Copycat-Fachkern kann der reine Domain-Lauf ausgeführt werden:
-
-```sh
-./gradlew -I /pfad/zu/graphstudio/adapters/copycat/web/tools/domain-validation.init.gradle \
-  testGraphstudioDomain --offline \
-  --tests '*GraphstudioExchangeTest.nativeCorpus' \
-  --tests '*DirectAreaInputsTest' --tests '*DynamicAreaSegmentTest' \
-  --tests '*SegmentBooleanTest' --tests '*SegmentArrangementTest' \
-  --tests '*RoomArrangementTest' --tests '*RoofsTest'
-```
-
-Der Lauf erzeugt `build/graphstudio-exchange/native.json`. Im vorbereiteten
-Web-Overlay des Fachkerns erzeugt die Browser-Testsuite daraus
-`build/graphstudio-exchange/browser.json`:
-
-```sh
-cd web
-npm run engine
-node --test --test-concurrency=1
-```
-
-Anschließend im Fachkern:
-
-```sh
-./gradlew -I /pfad/zu/graphstudio/adapters/copycat/web/tools/domain-validation.init.gradle \
-  testGraphstudioBrowserImport --offline
-```
-
-Die lokale Alpha aus dem Graphstudio-Ordner:
+Aus Graphstudio mit Java 21, Node.js ab 22.12 und den Buildabhängigkeiten:
 
 ```sh
 npm test
-npm run alpha
-npm run preview:alpha
+npm run build
+npm run preview
 ```
 
-Vorschau: `http://127.0.0.1:4319/copycat/`.
-Die Browserabnahme benötigt Python mit Playwright und Chromium unter
-`/usr/bin/chromium-browser`. Sie verwendet einen separaten Chromium-Kontext mit eigenen
-synthetischen Graphen und verändert keine gespeicherten Nutzerprojekte:
+Der öffentliche Build lädt ausschließlich den in `sources.lock.json`
+festgelegten sauberen Quellstand. Er führt den vollständigen nativen Testlauf,
+alle Browsertests und den anschließenden JVM-Rückimport aus. Erst danach
+entsteht `dist`, das vom bestehenden Pages-Workflow veröffentlicht wird.
+Der Kanal ist vom lokalen CC-Visual-Alpha-Experiment getrennt.
+
+Für den separaten nativen Testlauf im gepinnten Fachkern:
 
 ```sh
-python3 .cache/alpha-copycat/web/tools/verify-authoring-browser.py \
-  --url http://127.0.0.1:4319/copycat/ \
+./gradlew test
+```
+
+Die Browserabnahme benötigt Python mit Playwright und Chromium unter
+`/usr/bin/chromium-browser`. Sie verwendet einen separaten Browserkontext und
+synthetische Graphen; gespeicherte Nutzerprojekte werden nicht verändert:
+
+```sh
+python3 .cache/copycat-build/web/tools/verify-authoring-browser.py \
+  --url http://127.0.0.1:4317/copycat/ \
   --artifacts /tmp/graphstudio-authoring-browser-check
 ```
 
-## Ansichten aus dem Produktionsbuild
+## Produktionsansichten
 
 ![Segmentoperator mit 3D, 2D-Anordnung und Inspektor](images/graphstudio-segment-raster-desktop-2026-11-20.png)
 

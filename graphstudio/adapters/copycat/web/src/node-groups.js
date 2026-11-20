@@ -1,7 +1,7 @@
 import { parseMaterial } from './materials.js'
 import { validateReferences } from './documents.js'
 import { remapBuildingReferences } from './generated/engine.mjs'
-import { applyWires, connections, formGroups, inspect, protectedNode, replaceNodes } from './model.js'
+import { applyWires, connections, formGroups, inspect, model, protectedNode, replaceNodes } from './model.js'
 
 export function saveNodeGroup(mode, document, ids, name, materials = {}, library = null) {
   const entries = inspect(mode, document)
@@ -18,7 +18,7 @@ export function saveNodeGroup(mode, document, ids, name, materials = {}, library
     wires: connections(entries).filter(wire => selected.has(wire.source) && selected.has(wire.target)),
     groups: mode === 'form' ? structuredClone(formGroups(document).filter(group => used.has(group.id))) : [] }
 }
-export function insertNodeGroup(document, template, idFactory = () => `node_${crypto.randomUUID().slice(0, 13)}`) {
+export function insertNodeGroup(document, template, idFactory = () => `node_${crypto.randomUUID().slice(0, 13)}`, placement = null) {
   const mode = template.mode
   const ids = new Map(template.nodes.map(node => [node.id, idFactory()]))
   const groups = structuredClone(formGroups(document))
@@ -54,7 +54,10 @@ export function insertNodeGroup(document, template, idFactory = () => `node_${cr
   const right = Math.max(...document.graph.nodes.map(node => node.x ?? 0))
   const nodes = template.nodes.map(original => {
     const node = mode === 'building' ? { ...structuredClone(original), ...remapBuildingReferences(original, Object.fromEntries(ids)) } : structuredClone(original)
-    node.id = ids.get(original.id); node.x = Math.min(4096, right + 200 + (node.x ?? 0) - left); node.y = Math.min(4096, 80 + (node.y ?? 0) - top)
+    node.id = ids.get(original.id)
+    const x = (placement?.x ?? right + 200) + (node.x ?? 0) - left, y = (placement?.y ?? 80) + (node.y ?? 0) - top
+    if (placement && (x < model.positionMin || x > model.positionMax || y < model.positionMin || y > model.positionMax)) throw new Error('Die Referenz passt an dieser Knotenposition nicht in den Graphbereich.')
+    node.x = placement ? x : Math.min(4096, x); node.y = placement ? y : Math.min(4096, y)
     if (mode === 'form') {
       node.inputs = (node.inputs || []).map(() => '')
       if (node.part) node.part.group = groupIds.get(node.part.group || template.groups[0]?.id) || groups[0].id

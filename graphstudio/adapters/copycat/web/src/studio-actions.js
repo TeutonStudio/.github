@@ -27,16 +27,19 @@ export function referenceDisabled(entry, currentIdentity, readOnly = false, mode
   if(mode==='building' && entry.collection==='nodeGroups' && entry.mode==='form') return ''
   return ''
 }
-export function insertFormReference({mode,document,library,materials,entry,currentIdentity}) {
+export function insertFormReference({mode,document,library,materials,entry,currentIdentity,placement=null}) {
   const reason = referenceDisabled(entry,currentIdentity,false,mode)
   if (reason) throw new Error(reason)
   const result = mode === 'building' ? {...loadBuildingCopycat(document,library,entry),materials} : {...loadFormCopycatWithMaterials(document,entry,undefined,materials),library}
-  const occupied=inspect(mode,document).map(({node,ports})=>({x:node.x,y:node.y,height:70+ports.length*24}))
-  const top=Math.min(...occupied.map(node=>node.y)), right=Math.max(...occupied.map(node=>node.x)), left=Math.min(...occupied.map(node=>node.x))
-  const available=point=>point.x>=model.positionMin && point.x<=model.positionMax && point.y>=model.positionMin && point.y<=model.positionMax && occupied.every(node=>point.x+220<node.x || point.x>node.x+220 || point.y+110<node.y || point.y>node.y+node.height)
-  let point=[{x:right+260,y:top},{x:left-260,y:top}].find(available)
-  if(!point) for(let y=model.positionMin;y<=model.positionMax && !point;y+=180) for(let x=model.positionMin;x<=model.positionMax;x+=260) if(available({x,y})) {point={x,y};break}
-  if(!point) throw new Error('Kein freier Platz für den Referenzknoten.')
+  let point=placement
+  if(!point) {
+    const occupied=inspect(mode,document).map(({node,ports})=>({x:node.x,y:node.y,height:70+ports.length*24}))
+    const top=Math.min(...occupied.map(node=>node.y)), right=Math.max(...occupied.map(node=>node.x)), left=Math.min(...occupied.map(node=>node.x))
+    const available=point=>point.x>=model.positionMin && point.x<=model.positionMax && point.y>=model.positionMin && point.y<=model.positionMax && occupied.every(node=>point.x+220<node.x || point.x>node.x+220 || point.y+110<node.y || point.y>node.y+node.height)
+    point=[{x:right+260,y:top},{x:left-260,y:top}].find(available)
+    if(!point) for(let y=model.positionMin;y<=model.positionMax && !point;y+=180) for(let x=model.positionMin;x<=model.positionMax;x+=260) if(available({x,y})) {point={x,y};break}
+    if(!point) throw new Error('Kein freier Platz für den Referenzknoten.')
+  }
   const reference = {documentId:identityOf(entry),version:entry.version || 1,name:entry.name}
   result.document = {...result.document,graph:{...result.document.graph,nodes:result.document.graph.nodes.map(node => node.id === result.nodeId ? {...node,...point,libraryReference:reference} : node)}}
   return result

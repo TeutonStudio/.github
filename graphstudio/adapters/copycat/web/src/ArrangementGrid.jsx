@@ -7,7 +7,8 @@ const colors = ['#55b8d0', '#d69b62', '#90be78', '#ba8dcc', '#da7980', '#799ee0'
 
 export function ArrangementGrid({ node, document, library, edit, standalone=false, readOnly=false, onPreview }) {
   const pattern = node.kind === 'PATTERN'
-  const booleans = ['SEGMENT_UNION','SEGMENT_INTERSECTION','SEGMENT_DIFFERENCE','SEGMENT_SYMMETRIC_DIFFERENCE'].includes(node.kind)
+  const booleans = ['SEGMENT_UNION','SEGMENT_INTERSECTION','SEGMENT_DIFFERENCE','SEGMENT_SYMMETRIC_DIFFERENCE'].includes(node.kind) || node.kind==='SEGMENT_OPERATOR' && ['UNION','INTERSECTION','DIFFERENCE','SYMMETRIC_DIFFERENCE'].includes(node.operation || 'UNION')
+  const difference=node.kind==='SEGMENT_DIFFERENCE' || node.kind==='SEGMENT_OPERATOR' && node.operation==='DIFFERENCE'
   const segments = pattern || node.kind.startsWith('SEGMENT_')
   const [plane, setPlane] = useState(segments ? 'Z' : 'Y')
   const [patch, setPatch] = useState(null)
@@ -71,7 +72,7 @@ export function ArrangementGrid({ node, document, library, edit, standalone=fals
           cancelDrag(); setPlane(event.target.value); setViewport(null)
         }}><option value="Z">Vorne · X/Y</option><option value="Y">Oben · X/Z</option><option value="X">Seite · Z/Y</option></select></label>}
         <label>Eingang<select aria-label="Anordnungseingang" value={active} onChange={event => setSelected(Number(event.target.value))}>
-          {items.map((item, i) => <option key={i} value={i}>{node.kind==='SEGMENT_DIFFERENCE' ? ['A','B'][i] : i + 1}. {item.label}</option>)}
+          {items.map((item, i) => <option key={i} value={i}>{difference ? ['A','B'][i] : i + 1}. {item.label}</option>)}
         </select></label>
       </div>
       <p className="hint">Gemeinsamer Ursprung: X 0 · Y 0 · Z 0. 1 Rasterzelle = 1 Block = 16 hB. Ziehen verschiebt den gewählten Eingang; Pfeiltasten bewegen ihn um einen Block. Mittlere Maustaste verschiebt die Ansicht. Escape verwirft eine laufende Bewegung.</p>
@@ -81,7 +82,7 @@ export function ArrangementGrid({ node, document, library, edit, standalone=fals
         {current.model?.pending && <p>{current.model.pending}</p>}
         {conflicts.map((conflict,i) => <p key={i}>{conflictMessage(conflict)}</p>)}
       </div>}
-      <ul className="arrangement-legend">{items.map((item,i)=><li key={i}><span style={{background:colors[i%colors.length]}}/>{node.kind==='SEGMENT_DIFFERENCE'?['A','B'][i]:i+1}. {item.label}{item.error && <small>{item.error}</small>}</li>)}</ul>
+      <ul className="arrangement-legend">{items.map((item,i)=><li key={i}><span style={{background:colors[i%colors.length]}}/>{difference?['A','B'][i]:i+1}. {item.label}{item.error && <small>{item.error}</small>}</li>)}</ul>
       <svg ref={svg} className="arrangement-grid" viewBox={bounds.join(' ')} tabIndex={0}
         role="application" aria-label="2D-Anordnungsraster" onContextMenu={event => event.preventDefault()}
         onPointerDown={event => {

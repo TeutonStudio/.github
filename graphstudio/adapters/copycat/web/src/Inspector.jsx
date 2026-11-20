@@ -1,3 +1,4 @@
+import { families,operatorIdentity,signature } from './operators.js'
 import { cardTypeLabel } from './card-types.js'
 import { IntegerField } from './IntegerField.jsx'
 import { MirrorPlanePicker } from './MirrorPlanePicker.jsx'
@@ -7,9 +8,9 @@ import { ArrangementGrid } from './ArrangementGrid.jsx'
 import { NativeFields } from './NativeFields.jsx'
 import { formGroups, model } from './model.js'
 import { MaterialField } from './Workspace.jsx'
-import { copycatShapeNames } from './copycat-options.js'
+import { copycatShapeName } from './copycat-options.js'
 
-export const names = { REFERENCE:'Referenz',VECTOR_SPLIT:'Position zerlegen',
+export const names = { ...Object.fromEntries(Object.entries(families).map(([kind,f])=>[kind,f.label])), REFERENCE:'Referenz',VECTOR_SPLIT:'Position zerlegen',
   INT_ADD: 'Anzahl addieren',
   INT_SUBTRACT: 'Anzahl subtrahieren',
   INT_MULTIPLY: 'Anzahl multiplizieren',
@@ -40,6 +41,7 @@ export const names = { REFERENCE:'Referenz',VECTOR_SPLIT:'Position zerlegen',
 }
 
 export function portName(port, node) {
+  if(families[node.kind]) { const i=Number(port.id.replace('in:','')),op=signature(node),raw=op.types[Math.min(i,op.types.length-1)],type=raw==='geometry'?families[node.kind].output:raw;return `${['A','B','C'][i] || i+1} · ${type==='BOOLEAN'?'Aussage':type==='INT'?'Anzahl':type==='shape'?'Copycat':type==='segment'?'Segment':type==='position'?'Position':type==='rotation'?'Rotation':'Spiegelung'}${op.optional?.includes(i)?' (optional)':''}` }
   const native = { length: 'Länge (Y)', roofPeak: 'Dachspitze (optional)', roofEave: 'Dachendkante / Traufe (optional)', layout: 'Anordnung', geometry: 'Grundriss', area: 'Fläche', tread: 'Stufen', landing: 'Podest', enclosure: 'Schachtwände' }
   if(node.kind==='AREA' && ['length','height'].includes(port.id)) return `${node.areaMode==='SQUARE'?'Seitenlänge':port.id==='length'?'Breite X':'Länge Z'} · Anzahl`
   if(port.id.startsWith('area:')) return `Fläche · ${node.roofSections?.find(section=>section.id===port.id.slice(5))?.name || 'Dachfläche'}`
@@ -130,8 +132,7 @@ export function NodeFields({ mode, node, document, edit, library, onChooseCopyca
     <Field key={key} label={label} value={node[key]} onChange={value => edit({ [key]: value })} {...{ options, type, min, max }} />
   const number = (key, label, min, max) => field(key, label, undefined, 'number', min, max)
   const groups = formGroups(document)
-  const source = model.shapes.find(shape => shape.id === (node.inlinePart || node.part)?.source)
-  const sourceName = node.inlinePart ? copycatShapeNames[source?.name] || source?.name : node.kind === 'INPUT' ? copycatShapeNames[source?.name] || source?.name
+  const sourceName = node.inlinePart ? copycatShapeName(node.inlinePart) : node.kind === 'INPUT' ? copycatShapeName(node.part)
     : node.kind === 'SAVED' ? node.savedCopycat?.name : library.forms?.[node.form]?.name || node.form
   const copycatPicker = <button type="button" className="copycat-source-button" aria-label={mode==='building'?'Referenz auswählen':'Copycat auswählen'} onClick={onChooseCopycat}>
     <span>{mode==='building'?'Referenz auswählen …':'Copycat auswählen …'}</span><small>{sourceName || 'Grundform oder gespeicherte Form'}</small>

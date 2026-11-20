@@ -4,6 +4,7 @@ export function semanticType(raw = '') {
   if (Object.hasOwn(portStyles,raw)) return raw
   if (raw === 'shape' || raw === 'COPYCAT' || raw.startsWith('COPYCAT_')) return 'shape'
   if (['rotation', 'mirroring', 'position', 'transformation'].includes(raw.toLowerCase())) return raw.toLowerCase()
+  if (raw === 'BOOLEAN') return 'BOOLEAN'
   if (raw === 'INT') return 'INT'
   if (raw.startsWith('SEGMENT') || ['WALL', 'PATTERN', 'FLOOR', 'CEILING', 'ROTATION_SEGMENT'].includes(raw)) return 'segment'
   if (['ROOM', 'BAY_WINDOW', 'ROOM_LAYOUT', 'ROOM_GEOMETRY'].includes(raw)) return 'room'

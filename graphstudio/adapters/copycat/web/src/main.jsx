@@ -1,3 +1,7 @@
+import { DiagramNode,NodeAppearance } from './DiagramNode.jsx'
+import { NodeDialog } from './NodeDialog.jsx'
+import { changeOperator,operatorIdentity,signature,insertionPosition } from './operators.js'
+import { OperatorChoice,OperatorFields } from './OperatorChoice.jsx'
 import { selectNodes,clickNodes } from './selection.js'
 import { groupViews,viewWires,moveViewNodes,resolveViewConnection,insertSavedReference,splitVector } from './reference-groups.js'
 import { CopycatTransforms } from './CopycatTransforms.jsx'
@@ -21,6 +25,7 @@ import { authoringBuildingNode } from './generated/engine.mjs'
 import { Workspace, useWorkspace } from './Workspace.jsx'
 import { loadBuildingCopycat, loadFormCopycatWithMaterials } from './copycat-library.js'
 import { applyCopycatOption } from './copycat-selection.js'
+import { copycatPickerSelection } from './copycat-options.js'
 import { insertNodeGroup, mergeLibraries, saveNodeGroup } from './node-groups.js'
 import baseLibrary from '../../examples/library.json'
 import formExample from '../../examples/nodegraph-form.json'
@@ -40,8 +45,6 @@ import { AreaPreview } from './AreaPreview.jsx'
 // Keep the picker in the main bundle: switching dialogs must not depend on a stale deployment chunk.
 import CopycatPicker from './CopycatPicker.jsx'
 import { SelectionBoundary } from './SelectionBoundary.jsx'
-import { NodeDialog } from './NodeDialog.jsx'
-import { NodeAppearance } from './NodeAppearance.jsx'
 import { InputList } from './InputList.jsx'
 import { inputListEnabled } from './input-list.js'
 import { editInputs } from './model.js'
@@ -59,13 +62,6 @@ const examples = {
 }
 const query = new URLSearchParams(window.location.search)
 const initialMode = query.get('editor') === 'form' || query.get('graph') === 'copycat' ? 'form' : 'building'
-
-function DiagramNode({id,data,selected}) {
-  const updateInternals = useUpdateNodeInternals()
-  const signature = data.ports.map(port => `${port.id}:${port.source || ''}`).join('|')+';'+(data.outputs || []).map(output=>output.id).join('|')
-  useEffect(() => updateInternals(id), [id, signature, updateInternals])
-  return <NodeAppearance data={data} selected={selected} />
-}
 
 const nodeTypes = { architect: memo(DiagramNode) }
 const edgeStyle = { stroke: '#8daeb1', strokeWidth: 1.7 }
@@ -133,7 +129,9 @@ function Studio({ mode, active }) {
   const [dragging, setDragging] = useState({})
   const [message, setMessage] = useState(null)
   const [flow, setFlow] = useState(null)
-  const [nodeDialog, setNodeDialog] = useState(false)
+  const [nodeDialog,setNodeDialog]=useState(false),[catalogState,setCatalogState]=useState({})
+  const [paletteGhost,setPaletteGhost]=useState(null)
+  const paletteDrag=useRef(null)
   const [workspace, setWorkspace] = useState(0)
   // React Flow measurements belong to the view, never to the Minecraft document.
   const [nodeMeasurements, setNodeMeasurements] = useState({})
@@ -160,11 +158,11 @@ function Studio({ mode, active }) {
   const nodes = useMemo(() => {
     const hidden=new Set(foldedGroups.flatMap(group=>group.nodes))
     const ordinary=entries.filter(data=>!hidden.has(data.node.id)).map(data=>({
-      id:data.node.id,type:'architect',data:{...data,mode,onOperation:readOnly?undefined:kind=>changeOperation(data.node.id,kind),reference:document.graph.nodes.find(node=>node.id===data.node.id)?.libraryReference,diagnostic:diagnostics.find(item=>item.nodeId===data.node.id)?.message,hasOutput:data.node.id!==resultNode.node.id,groupName:document.graph.nodeGroups?.find(group=>group.nodes.includes(data.node.id))?.name},position:dragging[data.node.id] || {x:data.node.x,y:data.node.y},selected:selectedIds.includes(data.node.id),measured:nodeMeasurements[data.node.id]
+      id:data.node.id,type:'architect',data:{...data,reference:document.graph.nodes.find(node=>node.id===data.node.id)?.libraryReference,onOperation:operation=>transact(()=>commit(changeOperator(mode,document,data.node.id,operation))),readOnly,diagnostic:diagnostics.find(item=>item.nodeId===data.node.id)?.message,hasOutput:data.node.id!==resultNode.node.id,groupName:document.graph.nodeGroups?.find(group=>group.nodes.includes(data.node.id))?.name},position:dragging[data.node.id] || {x:data.node.x,y:data.node.y},selected:selectedIds.includes(data.node.id),measured:nodeMeasurements[data.node.id]
     }))
     const grouped=foldedGroups.map(group=>({id:group.id,type:'architect',position:dragging[group.id] || group.position,selected:selectedIds.includes(group.id),measured:nodeMeasurements[group.id],data:{node:{id:group.id,kind:group.presentation==='vectorSplit'?'VECTOR_SPLIT':'REFERENCE',name:group.name},ports:group.ports.map(port=>({...port,name:port.name || portName({...port,id:port.targetPort},entries.find(e=>e.node.id===port.targetNode).node)})),outputs:group.outputs,outputType:group.outputs[0]?.type,hasOutput:group.outputs.length>0,reference:group.libraryReference,diagnostic:diagnostics.find(item=>group.nodes.includes(item.nodeId))?.message}}))
     return [...ordinary,...grouped]
-  },[entries,document,foldedGroups,dragging,selectedIds,nodeMeasurements,diagnostics,readOnly,mode])
+  },[entries,document,foldedGroups,dragging,selectedIds,nodeMeasurements,diagnostics,readOnly])
   const onNodesChange = useCallback(changes => {
     if(changes.some(change=>change.type==='select')) setSelectedIds(previous=>selectNodes(previous,changes))
     const measured = changes.filter(change => change.type === 'dimensions' && change.dimensions)
@@ -250,24 +248,52 @@ function Studio({ mode, active }) {
     setNodeMeasurements({})
     setWorkspace(key => key + 1)
   }
-  const add = (kind,screenPoint) => transact(() => {
-    if (!kind || readOnly || count >= maxNodes) return
-    setNodeDialog(false)
-    const { left, top, width, height } = canvas.current.getBoundingClientRect()
-    const center = flow?.screenToFlowPosition(screenPoint || { x: left + width * 0.5, y: top + height * 0.4 }) ?? { x: 50, y: 50 }
-    pickerOrigin.current=null
-    if(mode==='building' && kind==='COPYCAT') {pickerOrigin.current=center;setReferenceTarget(null);setReferenceDialog(true);return}
-    if(kind==='POSITION_X') {const result=splitVector(mode,document,null,{x:position(center.x),y:position(center.y)});commit(result.document);setSelected(result.nodeId);setSelectedIds([result.nodeId]);return}
-    const id = `node_${crypto.randomUUID().slice(0, 13)}`
-    const created = newNode(mode === 'building', kind, id, position(center.x), position(center.y), true)
-    const node = mode==='building'?authoringBuildingNode(created):created
-    if (kind === 'INPUT') node.part.group = formGroups(document)[0].id
-    commit(replaceNodes(document, [...document.graph.nodes, node]))
-    setSelected(id)
-    if(kind==='AREA') setPreviewMode('selected')
-    setSelectedIds([id])
-    setSelectedWire(null)
+  const addDraft = (draft,location=null) => transact(() => {
+    if(readOnly || entries.length>=maxNodes) return
+    if(['INPUT','SAVED'].includes(draft.kind) && entries.filter(({node})=>['INPUT','SAVED'].includes(node.kind)).length>=model.formSources) throw new Error('Maximale Anzahl an Copycat-Quellen erreicht.')
+    const {left,top,width,height}=canvas.current.getBoundingClientRect()
+    const point=location || flow?.screenToFlowPosition({x:left+width*.5,y:top+height*.4}) || {x:50,y:50}
+    if(draft.kind==='POSITION_X') {
+      const result=splitVector(mode,document,null,{x:position(point.x),y:position(point.y)})
+      commit(result.document);setSelected(result.nodeId);setSelectedIds([result.nodeId]);setNodeDialog(false);return
+    }
+    const id=`node_${crypto.randomUUID().slice(0,13)}`
+    const created={...structuredClone(draft),id,x:position(point.x),y:position(point.y)}
+    const node=mode==='building'?authoringBuildingNode(created):created
+    if(node.kind==='INPUT') node.part.group=formGroups(document)[0].id
+    const candidate={...document,graph:{...document.graph,schema:Math.max(document.graph.schema,operatorIdentity(node)?mode==='building'?9:6:document.graph.schema)}}
+    commit(replaceNodes(candidate,[...document.graph.nodes,node]))
+    setSelected(id);setSelectedIds([id]);setSelectedWire(null);setNodeDialog(false)
+    if(node.kind==='AREA')setPreviewMode('selected')
   })
+  const startPaletteDrag=(event,node,entry)=>{
+    if(event.button!==0 || readOnly || entries.length>=maxNodes || event.target.closest('select,input,button'))return
+    event.preventDefault()
+    const rect=event.currentTarget.getBoundingClientRect()
+    paletteDrag.current={pointer:event.pointerId,node,entry,start:{x:event.clientX,y:event.clientY},grip:{x:event.clientX-rect.left,y:event.clientY-rect.top},started:false}
+  }
+  useEffect(()=>{
+    const move=event=>{
+      const drag=paletteDrag.current;if(!drag || drag.pointer!==event.pointerId)return
+      if(!drag.started && Math.hypot(event.clientX-drag.start.x,event.clientY-drag.start.y)<4)return
+      drag.started=true;setNodeDialog(false)
+      const zoom=flow?.getZoom() || 1
+      setPaletteGhost({...drag.entry,x:event.clientX-drag.grip.x*zoom,y:event.clientY-drag.grip.y*zoom,zoom})
+    }
+    const cancel=()=>{if(paletteDrag.current?.started)setNodeDialog(true);paletteDrag.current=null;setPaletteGhost(null)}
+    const up=event=>{
+      const drag=paletteDrag.current;if(!drag || event.pointerId!==drag.pointer)return
+      paletteDrag.current=null;setPaletteGhost(null)
+      if(!drag.started)return
+      const rect=canvas.current?.getBoundingClientRect()
+      if(flow && rect && event.clientX>=rect.left && event.clientX<=rect.right && event.clientY>=rect.top && event.clientY<=rect.bottom) {
+        addDraft(drag.node,insertionPosition({x:event.clientX,y:event.clientY},drag.grip,flow))
+      } else setNodeDialog(true)
+    }
+    const key=event=>{if(event.key==='Escape' && paletteDrag.current){event.preventDefault();event.stopImmediatePropagation();cancel()}}
+    window.addEventListener('pointermove',move);window.addEventListener('pointerup',up);window.addEventListener('pointercancel',cancel);window.addEventListener('blur',cancel);window.addEventListener('keydown',key,true)
+    return ()=>{window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',up);window.removeEventListener('pointercancel',cancel);window.removeEventListener('blur',cancel);window.removeEventListener('keydown',key,true)}
+  },[flow,document,readOnly,entries.length])
   const onDrag = useCallback((_, node, moved) => setDragging(Object.fromEntries((moved?.length ? moved : [node]).map(item=>[item.id,item.position]))), [])
   const onDragStop = (_, node, moved) => {
     const positions=moveViewNodes(document,foldedGroups,moved?.length?moved:[node])
@@ -320,8 +346,7 @@ function Studio({ mode, active }) {
     if (readOnly) return
     setFileDialog(false)
     const node = entries.find(entry => entry.node.id === nodeId)?.node
-    const initialId = node?.inlinePart ? `base:${node.inlinePart.source}` : node?.kind === 'INPUT' ? `base:${node.part.source}` : node?.kind === 'COPYCAT' ? `library:${node.form}` : null
-    setCopycatPicker({ nodeId, initialId: basic && !node?.inlinePart && node?.kind !== 'INPUT' ? null : initialId, initialCategory: basic ? 'basic' : node && node.kind !== 'INPUT' && !node.inlinePart ? 'saved' : 'basic' })
+    setCopycatPicker({ nodeId, ...copycatPickerSelection(node, basic) })
   }
   const applyCopycat = option => {
     const result = applyCopycatOption({ mode, document, library, materials, nodeId: copycatPicker.nodeId, option })
@@ -333,12 +358,13 @@ function Studio({ mode, active }) {
   }
   const count = entries.length
   const maxNodes = mode === 'form' ? model.formNodes : model.buildingNodes
-  const portLimits = mode === 'form' ? model.form.find(type => type.kind === visibleNode.node.kind)
-    : model.buildingInputs[visibleNode.node.kind] ?? null
-  const inputProperties=model.nodeProperties[mode][visibleNode.node.kind]
+  const portLimits = signature(visibleNode.node) || (mode === 'form' ? model.form.find(type => type.kind === visibleNode.node.kind)
+    : model.buildingInputs[visibleNode.node.kind] ?? null)
+
+  const inputProperties=signature(visibleNode.node) || model.nodeProperties[mode][visibleNode.node.kind]
   const dynamicInputs=inputListEnabled(inputProperties) && !visibleNode.node.resultType
   const reorderInputs=order=>transact(()=>{commit(editInputs(mode,document,visibleNode.node.id,order));setSelectedWire(null)})
-  const arrangementNode=mode==='building' && current && !selectedGroup && (current.node.kind==='PATTERN' || ['SEGMENT_UNION','SEGMENT_INTERSECTION','SEGMENT_DIFFERENCE','SEGMENT_SYMMETRIC_DIFFERENCE','SEGMENT_ROTATE','SEGMENT_MIRROR','SEGMENT_TRANSFORM'].includes(current.node.kind)) ? current.node : null
+  const arrangementNode=mode==='building' && current && !selectedGroup && (current.node.kind==='PATTERN' || ['SEGMENT_OPERATOR','SEGMENT_UNION','SEGMENT_INTERSECTION','SEGMENT_DIFFERENCE','SEGMENT_SYMMETRIC_DIFFERENCE','SEGMENT_ROTATE','SEGMENT_MIRROR','SEGMENT_TRANSFORM'].includes(current.node.kind)) ? current.node : null
   const onArrangementPreview=useCallback(patch=>setArrangementDraft(patch?{id:arrangementNode?.id,patch}:null),[arrangementNode?.id])
   const previewDocument=useMemo(()=>{
     if(!arrangementDraft || arrangementDraft.id!==arrangementNode?.id) return document
@@ -421,9 +447,11 @@ function Studio({ mode, active }) {
   }
   const insertReference = entry => transact(() => {
     if(readOnly) return
-    const result=insertSavedReference({mode,document,library,materials,entry,currentIdentity:fileIdentity,targetId:referenceDialog?referenceTarget:null})
-    locatePickerResult(result)
-    commit(result.document);setLibrary(result.library);setMaterials(result.materials);setSelected(result.nodeId);setSelectedIds([result.nodeId]);setSelectedWire(null);setFileDialog(false);setReferenceDialog(false);setReferenceTarget(null);setWorkspace(key=>key+1)
+    const targetId=referenceDialog?referenceTarget:null
+    const result=insertSavedReference({mode,document,library,materials,entry,currentIdentity:fileIdentity,targetId})
+    commit(result.document);setLibrary(result.library);setMaterials(result.materials);setSelected(result.nodeId);setSelectedIds([result.nodeId]);setSelectedWire(null);setFileDialog(false);setReferenceDialog(false);setReferenceTarget(null)
+    pickerOrigin.current=null
+    if(!targetId) setWorkspace(key=>key+1)
   })
   const splitPosition=()=>transact(()=>{const result=splitVector(mode,document,visibleNode.node.id);commit(result.document);setSelected(result.nodeId);setSelectedIds([result.nodeId])})
   const unpackReference=()=>transact(()=>{commit({...document,graph:{...document.graph,nodeGroups:document.graph.nodeGroups.map(group=>group.id===selectedGroup.id?{...group,libraryReference:null,presentation:null}:group)}});setSelected(null);setSelectedIds([])})
@@ -450,17 +478,14 @@ function Studio({ mode, active }) {
   }
   useEffect(() => {
     if(!active) return
-    const handler=event=>{if(window.document.querySelector('dialog[open],.library-overlay,[role="dialog"]')) return;keydown(event)}
+    const handler=event=>{if(paletteDrag.current || window.document.querySelector('dialog[open],.library-overlay,[role="dialog"]')) return;keydown(event)}
     window.addEventListener('keydown',handler)
     return ()=>window.removeEventListener('keydown',handler)
   },[active,keydown])
   return <div className="studio" hidden={!active}>
-    {nodeDialog && <NodeDialog mode={mode} onPlace={(kind,point)=>{
-      const rect=canvas.current.getBoundingClientRect()
-      if(point.x<rect.left || point.x>rect.right || point.y<rect.top || point.y>rect.bottom || readOnly || count>=maxNodes) return false
-      add(kind,point);return true
-    }} properties={model.nodeProperties[mode]} kinds={kinds} count={count} maxNodes={maxNodes} onAdd={add} onClose={()=>setNodeDialog(false)} />}
-    {referenceDialog && <FileDialog mode={mode} library={library} referenceOnly currentIdentity={fileIdentity} readOnly={readOnly} onChoose={insertReference} onReference={insertReference} onClose={()=>{pickerOrigin.current=null;setReferenceDialog(false)}} actions={!foldedGroups.some(group=>group.id===referenceTarget) && <button onClick={()=>transact(()=>{chooseCopycat(referenceTarget,true);setReferenceDialog(false)})}>Grundform wählen …</button>} />}
+    {nodeDialog && <NodeDialog {...{mode,document,kinds,count,maxNodes}} onAdd={addDraft} onClose={()=>setNodeDialog(false)} onGrab={startPaletteDrag} state={catalogState} setState={setCatalogState}/>}
+    {paletteGhost && <div className="palette-ghost" style={{left:paletteGhost.x,top:paletteGhost.y,transform:`scale(${paletteGhost.zoom})`}}><NodeAppearance preview data={{...paletteGhost,hasOutput:true,readOnly:true}}/></div>}
+    {referenceDialog && <FileDialog mode={mode} library={library} referenceOnly referenceTargetId={referenceTarget} currentIdentity={fileIdentity} readOnly={readOnly} onChoose={insertReference} onReference={insertReference} onClose={()=>setReferenceDialog(false)} actions={!foldedGroups.some(group=>group.id===referenceTarget) && <button onClick={()=>{setReferenceDialog(false);chooseCopycat(referenceTarget,true)}}>Grundform wählen …</button>} />}
     {fileDialog && <FileDialog mode={mode} library={library} currentIdentity={fileIdentity} readOnly={readOnly} onChoose={openEntry} onReference={insertReference} onClose={() => setFileDialog(false)} actions={<>    <div className="toolbar">
       <label className="example-select"><span>BEISPIELE</span><select aria-label="Beispiel öffnen" value="" onChange={e => transact(() => open(examples[mode][Number(e.target.value)][1]))}>
         <option value="" disabled>Beispiel öffnen</option>
@@ -564,7 +589,6 @@ function Studio({ mode, active }) {
             {selectedGroup ? <><h2>{selectedGroup.name}</h2>{selectedGroup.libraryReference && <p>Referenz · v{selectedGroup.libraryReference.version}</p>}<p className="hint">{selectedGroup.nodes.length} gespeicherte Knoten · {selectedGroup.outputs.length} typisierte Ausgänge</p>{selectedGroup.outputs.length>1 && <label>Vorschauausgang<select aria-label="Vorschauausgang" value={current?.node.id || ''} onChange={e=>setGroupPreview(value=>({...value,[selectedGroup.id]:e.target.value}))}>{selectedGroup.outputs.map(output=><option key={output.id} value={output.id}>{output.name} · {output.type}</option>)}</select></label>}{selectedGroup.ports.map(port=><Field key={port.id} label={port.name || portName({...port,id:port.targetPort},entries.find(e=>e.node.id===port.targetNode).node)} value={port.source} options={[[ '', 'Offen' ],...entries.filter(entry=>!selectedGroup.nodes.includes(entry.node.id) && port.accepts.includes(entry.node.kind)).map(entry=>[entry.node.id,entry.node.name || names[entry.node.kind]])]} onChange={source=>{if(source) connectView({source,target:selectedGroup.id,targetHandle:port.id});else transact(()=>{const targets=port.targets || [{target:port.targetNode,port:port.targetPort}];commit(applyWires(mode,document,entries,wires.filter(wire=>!targets.some(target=>target.target===wire.target && target.port===wire.port))))})}}/>)}{selectedGroup.libraryReference && <button onClick={()=>{setReferenceTarget(selectedGroup.id);setReferenceDialog(true)}}>Referenz auswählen …</button>}<button onClick={unpackReference}>Als unabhängige Knoten auspacken</button></> : <>
             <a className="reference-link" href={`${wiki}/Knoten-${mode === 'form' ? 'Formgraph' : 'Gebaeudegraph'}#${visibleNode.node.kind.toLowerCase()}`}>Knotenreferenz ↗</a>
             <h2>{visibleNode.node.name || operatorFamily(mode,visibleNode.node.kind)?.label || names[visibleNode.node.kind]}</h2>
-            {operatorFamily(mode,visibleNode.node.kind) && <Field label="Operation" value={visibleNode.node.kind} options={operatorFamily(mode,visibleNode.node.kind).operations} onChange={kind=>changeOperation(visibleNode.node.id,kind)}/>}
             <div className="node-id">{visibleNode.node.id} · Ausgang: {visibleNode.outputType || 'Ergebnis'}</div>
             {dynamicInputs && <InputList entry={visibleNode} entries={entries} limits={portLimits} properties={inputProperties} onConnect={setWire} onOrder={reorderInputs} />}
             {!dynamicInputs && visibleNode.ports.length > 0 && <details open><summary>Verbindungen</summary>
@@ -582,10 +606,11 @@ function Studio({ mode, active }) {
                   })}>Letzten Eingang entfernen</button>
               </div>}
             </details>}
-            <NodeFields {...{ mode, node: visibleNode.node, document, edit: patchNode, library }}
+            {operatorIdentity(visibleNode.node) && <><OperatorChoice node={visibleNode.node} disabled={readOnly} onChange={operation=>transact(()=>commit(changeOperator(mode,document,visibleNode.node.id,operation)))}/><OperatorFields roles={Object.keys(document.palette || {})} node={visibleNode.node} edit={patchNode}/></>}
+            {!operatorIdentity(visibleNode.node) && <NodeFields {...{ mode, node: visibleNode.node, document, edit: patchNode, library }}
               onInspectNode={id => { setSelected(id); setSelectedIds([id]); setSelectedWire(null) }}
               onChooseCopycat={() => chooseCopycat(visibleNode.node.id)}
-              onImportCopycat={() => copycatInput.current.click()} />
+              onImportCopycat={() => copycatInput.current.click()} />}
 
             {visibleNode && !visibleNode.node.resultType && (visibleNode.outputType === 'shape' || visibleNode.outputType?.startsWith('COPYCAT') || ['ROTATION','POSITION'].includes(visibleNode.node.kind)) && <CopycatTransforms node={visibleNode.node} edit={patchNode} primary />}
             {!visibleNode.node.resultType && visibleNode.outputType?.toLowerCase()==='position' && <button onClick={splitPosition}>In X/Y/Z zerlegen</button>}

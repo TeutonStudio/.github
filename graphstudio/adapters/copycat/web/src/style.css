@@ -619,3 +619,26 @@ button.danger:hover:not(:disabled),.file-list button.delete-armed {color:#fff;ba
 .is-standalone > .arrangement-apply {grid-area:actions;margin:0;gap:5px}
 .is-standalone label {font-size:11px;margin:0;gap:2px}.is-standalone input,.is-standalone select {min-height:26px;padding:3px 5px;font-size:12px}
 .is-standalone .arrangement-apply button {min-height:26px;padding:3px 6px;font-size:11px}
+
+/* The node catalogue uses the same node presentation and operation signatures as the map. */
+.graph-heading .graph-identity {flex:1;min-width:0}
+.graph-heading > .button-row {margin-left:auto;width:auto;justify-content:flex-end}
+.operator-choice {display:block;width:calc(100% - 12px);margin:6px;font-size:11px;min-width:0;max-width:100%;padding:4px}
+.node-dialog {width:min(1160px,calc(100vw - 24px));}
+.catalog-tools {display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:10px}
+.catalog-tools label {display:grid;gap:4px;font-size:12px}.catalog-tools input,.catalog-tools select {width:100%;min-width:0}
+.catalog-filters {margin:12px 0}.filter-group {margin:8px 0;padding:10px;border:1px solid #61727b;border-radius:6px}.filter-condition {display:flex;gap:8px;margin:8px 0}.filter-condition select {min-width:0}.filter-group .button-row {flex-wrap:wrap}
+.catalog-group>summary {cursor:pointer;padding:8px 0;font-weight:600}.node-catalog {display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px;padding:6px 3px 14px}
+.catalog-card {min-width:0;padding:14px;border:1px solid #52656e;border-radius:8px;background:#213039;outline:none;cursor:default}.catalog-card.chosen,.catalog-card:focus-visible {border-color:#b1e7d7;box-shadow:0 0 0 1px #b1e7d7}.catalog-card p {font-size:12px;line-height:1.55;margin:12px 0 8px}.catalog-card>small {font-size:11px;color:#b4c7cc}.catalog-node {display:flex;justify-content:center;padding:6px}.catalog-node .diagram-node {cursor:grab;touch-action:none;user-select:none;position:relative;flex-shrink:0}.preview-socket {position:absolute;width:8px;height:8px;top:50%;transform:translateY(-50%);border:1px solid white;border-radius:50%}.preview-socket.target {left:-5px}.preview-socket.source {right:-5px}.operator-fields {display:grid;gap:8px}.operator-fields label {display:grid;gap:4px;font-size:12px}.operator-fields input,.operator-fields select {width:100%;min-width:0}.operator-fields fieldset {display:flex;gap:8px;min-width:0}.operator-fields fieldset label {min-width:0;flex:1}
+.palette-ghost {position:fixed;z-index:10000;pointer-events:none;transform-origin:top left;opacity:.9;filter:drop-shadow(0 10px 20px #0009)}
+.node-dialog>footer {position:sticky;bottom:-18px;background:#182830;padding:12px 0;margin-top:12px;border-top:1px solid #52656e}
+@media(max-width:750px){.catalog-tools{grid-template-columns:1fr 1fr}.catalog-tools label:first-child{grid-column:1/-1}.node-dialog>footer{flex-wrap:wrap}.filter-condition{flex-wrap:wrap}.graph-heading .graph-identity{flex:1 1 auto;width:auto}}
+
+.area-drawing-tools { flex:none; min-width:0; margin:0; padding:6px; border:1px solid #607983; }
+.area-drawing-tools label { display:grid; gap:4px; font-size:12px; }
+.area-drawing-tools select { min-width:0; width:100%; }
+.area-drawing-tools .hint { margin:6px 0 0; }
+
+.node-dialog .catalog-groups {flex:1;min-height:0;overflow:auto;padding-right:4px;scrollbar-gutter:stable}
+.node-dialog > .catalog-tools,.node-dialog > .catalog-filters,.node-dialog > .hint {flex:0 0 auto}
+.node-dialog > footer {position:static;flex:0 0 auto}
