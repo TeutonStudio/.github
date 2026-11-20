@@ -1,3 +1,4 @@
+import { MirrorPlanePicker } from './MirrorPlanePicker.jsx'
 import { model } from './model.js'
 import { families,operatorIdentity,symbols,signature } from './operators.js'
 export function OperatorChoice({node,onChange,disabled=false}) {
@@ -15,7 +16,7 @@ export function OperatorFields({node,edit,showDescription=true,roles=[]}) {
  {family==='STATEMENT_OPERATOR' && op==='VALUE' && <label>Aussage<select value={String(node.booleanValue ?? false)} onChange={e=>edit({booleanValue:e.target.value==='true'})}><option value="false">Falsch</option><option value="true">Wahr</option></select></label>}
  {(family==='POSITION_OPERATOR' && op==='VALUE' || op==='TRANSLATE') && <fieldset><legend>Position (hB)</legend>{['x','y','z'].map(axis=><label key={axis}>{axis.toUpperCase()}<input type="number" step="1" defaultValue={node.translation?.[axis] ?? 0} key={`${node.id}:${axis}:${node.translation?.[axis]}`} onBlur={e=>{const v=Number(e.target.value);if(Number.isInteger(v) && Math.abs(v)<=2147483647)edit({translation:{...node.translation,[axis]:v}})}}/></label>)}</fieldset>}
  {op==='ROTATE' && <><label>Achse<select value={node.rotationAxis || 'Y'} onChange={e=>edit({rotationAxis:e.target.value})}>{['X','Y','Z'].map(a=><option key={a}>{a}</option>)}</select></label><label>Drehung<select value={node.quarterTurns || 0} onChange={e=>edit({quarterTurns:Number(e.target.value)})}>{[0,1,2,3].map(a=><option value={a} key={a}>{a*90}°</option>)}</select></label></>}
- {op==='MIRROR' && <label>Spiegelebene<select value={node.mirror?.plane || 'X'} onChange={e=>edit({mirror:{plane:e.target.value}})}>{(family==='COPYCAT_OPERATOR'?model.mirrorPlanes:['X','Y','Z']).map(a=><option key={a}>{a}</option>)}</select></label>}
+ {op==='MIRROR' && <MirrorPlanePicker value={node.mirror?.plane || 'X'} planes={family==='COPYCAT_OPERATOR'?model.mirrorPlanes:['X','Y','Z']} onChange={plane=>edit({mirror:{plane}})}/>}
  {['COPYCAT_OPERATOR','SEGMENT_OPERATOR'].includes(family) && <><label>Materialzuordnung<select value={node.materialMode || 'SEPARATED'} onChange={e=>edit({materialMode:e.target.value})}><option value="SEPARATED">Materialien getrennt erhalten</option><option value="GROUPED">Gemeinsame Materialrolle</option></select></label>{(node.materialMode==='GROUPED' || op==='INVERT') && <label>Materialrolle<select value={node.role || 'wall'} onChange={e=>edit({role:e.target.value})}>{[...new Set([node.role || 'wall',...roles])].map(role=><option key={role}>{role}</option>)}</select></label>}</>}
  </div>
 }

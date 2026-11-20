@@ -125,3 +125,22 @@ Flächen: Quadrat, Rechteck oder direkt im 2D-Raster zeichnen. Dynamische
 Segmentachsen werden erst am Raum/Dach aufgelöst. Neue Dachknoten bieten fünf
 Vorlagenanschlüsse und ermitteln deren Anwendungsstellen automatisch.
 Flächen/Dynamik benötigen Gebäudegraphschema 7, gemeinsame Karten Schema 8.
+
+
+## Flächenwerkzeuge und Spiegelachsenraster
+
+Im Fläche-Knoten steht unter **Bedienung** die Auswahl **Malen**, **Rechteck ziehen**
+und **Quadrat ziehen**. Ein Werkzeug übernimmt eine bisher über Anzahlen definierte
+Fläche in das freie Raster. Rechteck und Quadrat zeigen beim Ziehen eine Vorschau;
+ein Loslassen übernimmt den ganzen Strich als einen rückgängig machbaren Schritt.
+Alt entfernt den gezogenen Bereich, Escape verwirft den Strich. Verkleinern einer
+Vorschau hinterlässt keine vorher überstrichenen Zellen. Die Begrenzung auf 16384
+Zellen und X/Z von −128 bis 127 bleibt erhalten; Überschreitungen verändern die
+vorherige Fläche nicht. Die bestehenden Flächenformen und Anzahlanschlüsse bleiben
+für die parametrische Eingabe verfügbar.
+
+Die Spiegelachsenauswahl belegt die gesamte verfügbare Zeilenbreite und passt ihre
+Rasterspalten an den Inspektor an. Reihenfolgeknöpfe stehen unter der Auswahl.
+Kacheln zeigen die Ebene und ihre Achsenbezeichnung; die aktive Kachel wird markiert.
+Pfeiltasten navigieren innerhalb des aktuellen Rasters, Home/End zur ersten/letzten
+Ebene. Auch die Spiegeloperation in einer Operatorfamilie verwendet diese Auswahl.
