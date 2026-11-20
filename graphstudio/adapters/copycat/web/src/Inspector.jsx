@@ -27,6 +27,7 @@ export const names = { ...Object.fromEntries(Object.entries(families).map(([kind
   POSITION_Y: 'Position zerlegen · Y',
   POSITION_Z: 'Position zerlegen · Z',
 
+  TRANSFORMATION:'Transformation', COPYCAT_TRANSFORM:'Copycat transformieren', SEGMENT_TRANSFORM:'Segment transformieren',
   POSITION:'Position (hB)', TRANSLATE:'Copycat positionieren', COPYCAT_POSITION:'Copycat positionieren', INT: 'Anzahl', ROTATION_SEGMENT: 'Rotationssegment', AREA: 'Fläche', SEGMENT_LAYOUT: 'Segmentanordnung', ROOM_GEOMETRY: 'Raumgrundriss', ROOF_LEVEL: 'Dachebene', ROOF_LAYOUT: 'Dachanordnung', STAIRWELL: 'Treppenhaus', ELEVATOR_SHAFT: 'Aufzugsschacht', SERVICE_SHAFT: 'Installationsschacht', GARDEN: 'Garten', PATH: 'Weg', ROOM_LAYOUT: 'Raumanordnung', BAY_WINDOW: 'Erker', DORMER: 'Gaube',
   INPUT: 'Grundform', UNION: 'Vereinigung', INTERSECTION: 'Schnitt', DIFFERENCE: 'Differenz',
   SYMMETRIC_DIFFERENCE: 'Symmetrische Differenz', ROTATE: 'Copycat rotieren', ROTATION: 'Rotation', OUTPUT: 'Ergebnis',
@@ -43,6 +44,9 @@ export function portName(port, node) {
   if(families[node.kind]) { const i=Number(port.id.replace('in:','')),op=signature(node),raw=op.types[Math.min(i,op.types.length-1)],type=raw==='geometry'?families[node.kind].output:raw;return `${['A','B','C'][i] || i+1} · ${type==='BOOLEAN'?'Aussage':type==='INT'?'Anzahl':type==='shape'?'Copycat':type==='segment'?'Segment':type==='position'?'Position':type==='rotation'?'Rotation':'Spiegelung'}${op.optional?.includes(i)?' (optional)':''}` }
   const native = { length: 'Länge (Y)', roofPeak: 'Dachspitze (optional)', roofEave: 'Dachendkante / Traufe (optional)', layout: 'Anordnung', geometry: 'Grundriss', area: 'Fläche', tread: 'Stufen', landing: 'Podest', enclosure: 'Schachtwände' }
   if(node.kind==='AREA' && ['length','height'].includes(port.id)) return `${node.areaMode==='SQUARE'?'Seitenlänge':port.id==='length'?'Breite X':'Länge Z'} · Anzahl`
+  if(port.id.startsWith('area:')) return `Fläche · ${node.roofSections?.find(section=>section.id===port.id.slice(5))?.name || 'Dachfläche'}`
+  if(port.id.startsWith('sectionDormer:')) return 'Gaube · Dachfläche'
+  if(port.id==='layout' && node.kind==='SEGMENT' || port.id==='geometry' && node.kind==='ROOM') return 'Fläche / bisherige Geometrie'
   if (native[port.id]) return native[port.id]
   if (port.id.startsWith('region:')) return `Bereich ${port.id.slice(7)}`
   if (port.id.startsWith('semantic:')) {
@@ -52,6 +56,8 @@ export function portName(port, node) {
   if (port.id.startsWith('edge:')) return `Wandkante ${port.id.slice(5)}`
   if(node.kind==='POSITION' && /^\d$|^in:[0-2]$/.test(port.id)) return ['X','Y','Z'][Number(port.id.replace('in:',''))] + ' · Anzahl'
   if(/^POSITION_[XYZ]$/.test(node.kind)) return 'Position · Vektor3'
+  if(node.kind==='TRANSFORMATION') return {0:'Spiegelung',1:'Rotation',2:'Position (hB)',mirroring:'Spiegelung',rotation:'Rotation',positionValue:'Position (hB)'}[port.id] || port.id
+  if(port.id==='transformationValue' || node.kind==='COPYCAT_TRANSFORM' && port.id==='1') return 'Transformation'
   if (port.id === 'positionValue') return 'Position (hB)'
   if (['MIRROR','TRANSLATE'].includes(node.kind) && port.id === '1') return node.kind === 'MIRROR' ? 'Spiegelung' : 'Position (hB)'
   if (port.id === 'rotation') return 'Rotationen'

@@ -1,3 +1,4 @@
+import { model } from './model.js'
 export const nodeCategories = [
   ['sources', 'Quellen und Referenzen', 'Grundformen oder gespeicherte Inhalte als Ausgangspunkt verwenden.'],
   ['copycat', 'Copycats bearbeiten', 'Formen kombinieren, voneinander abziehen oder ausrichten.'],
@@ -7,7 +8,19 @@ export const nodeCategories = [
   ['values', 'Werte und Berechnungen', 'Zahlen, Positionen, Drehungen und Spiegelungen an andere Knoten weitergeben.'],
   ['landscape', 'Außenanlagen', 'Gärten und Wege für die Umgebung erstellen.'],
 ]
+
+// Shared by the minimap and category markers in the node dialog.
+export const nodeCategoryColors = Object.freeze({
+  sources:'#4db6ac', copycat:'#66b5ff', segments:'#e8b85d', building:'#c59bff',
+  layouts:'#f38fbd', values:'#8ecf70', landscape:'#c98d62',
+})
+export const nodeCategoryColor = kind => nodeCategoryColors[categoryOfNode(kind)]
+export const miniMapNodeColor = node => nodeCategoryColor(node.data?.node?.kind)
+
 const descriptions = {
+  TRANSFORMATION:'Spiegelung, Rotation und Position zu einem Transformation-Wert bündeln. Reihenfolge im Inspektor wählbar; Standard: Spiegeln → Rotieren → Positionieren (SRP).',
+  COPYCAT_TRANSFORM:'Einen Copycat mit dem angeschlossenen Transformation-Wert spiegeln, rotieren und positionieren. Ohne Wert bleibt er unverändert.',
+  SEGMENT_TRANSFORM:'Ein Segment mit dem angeschlossenen Transformation-Wert spiegeln, rotieren und positionieren. Positionen in hB; 16 hB entsprechen einem Block.',
   COPYCAT: 'Eine Grundform oder gespeicherte Version als Copycat-Quelle verwenden. Nach dem Einfügen lässt sich die Quelle im Inspektor auswählen.',
   INPUT: 'Eine Copycat-Grundform erzeugen. Form, Größe und Ausrichtung stellst du im Inspektor ein.',
   SAVED: 'Eine gespeicherte Copycat-Form mit ihren Materialgruppen als Quelle verwenden.',
@@ -40,8 +53,8 @@ const descriptions = {
   MIRRORING: 'Eine Spiegelebene als wiederverwendbaren Wert bereitstellen.',
 }
 const operations = {
-  UNION: 'Die belegten Bereiche aller Eingänge vereinigen.',
-  INTERSECTION: 'Nur den gemeinsamen Bereich aller Eingänge behalten.',
+  UNION: 'Die belegten Bereiche der verbundenen Eingänge vereinigen. Ohne Verbindung entsteht ein leerer Copycat.',
+  INTERSECTION: 'Den gemeinsamen Bereich der verbundenen Eingänge behalten. Ohne Verbindung entsteht ein Copycat-Vollblock.',
   DIFFERENCE: 'Den zweiten Eingang B vom ersten Eingang A abziehen: A minus B.',
   SYMMETRIC_DIFFERENCE: 'Die Formen vereinigen und ihre gemeinsamen Bereiche entfernen.',
   ROTATE: 'Die Geometrie in 90°-Schritten um X, Y oder Z drehen. Ein Rotationswert kann die Einstellung liefern.',
@@ -50,16 +63,19 @@ const operations = {
 }
 const calculations = {ADD:'addieren',SUBTRACT:'voneinander abziehen',MULTIPLY:'multiplizieren',DIVIDE:'dividieren',MIN:'auf den kleineren Wert begrenzen',MAX:'auf den größeren Wert begrenzen'}
 export function describeCatalogNode(kind) {
+  if(model.operators?.[kind]) return model.operators[kind].description
   if (descriptions[kind]) return descriptions[kind]
   const calculation = kind.match(/^(INT|POSITION)_(ADD|SUBTRACT|MULTIPLY|DIVIDE|MIN|MAX)$/)
-  if(calculation) return `${calculation[1] === 'INT' ? 'Zwei ganze Zahlen' : 'Zwei Positionen komponentenweise'} ${calculations[calculation[2]]}. Das Ergebnis lässt sich mit weiteren Knoten verbinden.`
+  if(calculation) return `${['ADD','MULTIPLY','MIN','MAX'].includes(calculation[2]) ? 'Zwei bis sechzehn' : 'Zwei'} ${calculation[1] === 'INT' ? 'ganze Zahlen' : 'Positionen komponentenweise'} ${calculations[calculation[2]]}. Das Ergebnis lässt sich mit weiteren Knoten verbinden.`
+  if(kind==='SEGMENT_UNION') return 'Die belegten Bereiche aller verbundenen Segmente vereinigen.'
+  if(kind==='SEGMENT_INTERSECTION') return 'Nur den gemeinsamen Bereich der angeschlossenen Segmente behalten.'
   const operation = kind.replace(/^(COPYCAT|SEGMENT)_/, '')
   return operations[kind === 'TRANSLATE' ? 'POSITION' : operation] || 'Einen Knoten hinzufügen und seine Eigenschaften im Inspektor einstellen.'
 }
-export function categoryOfNode(kind) {
-  if(['COPYCAT','INPUT','SAVED'].includes(kind)) return 'sources'
+export function categoryOfNode(kind = '') {
+  if(['COPYCAT','INPUT','SAVED','REFERENCE'].includes(kind)) return 'sources'
   if(['GARDEN','PATH'].includes(kind)) return 'landscape'
-  if(['NUMBER_OPERATOR','RELATION_OPERATOR','STATEMENT_OPERATOR'].includes(kind) || /^(INT|POSITION)(_|$)/.test(kind) || ['ROTATION','MIRRORING'].includes(kind)) return 'values'
+  if(/^(INT|POSITION)(_|$)/.test(kind) || ['ROTATION','MIRRORING','TRANSFORMATION','VECTOR_SPLIT','NUMBER_OPERATOR','RELATION_OPERATOR','STATEMENT_OPERATOR'].includes(kind)) return 'values'
   if(['AREA','SEGMENT_LAYOUT','ROOM_GEOMETRY','ROOM_LAYOUT','ROOF_LAYOUT'].includes(kind)) return 'layouts'
   if(kind.startsWith('SEGMENT_') || ['SEGMENT','PATTERN','ROTATION_SEGMENT'].includes(kind)) return 'segments'
   if(kind.startsWith('COPYCAT_') || ['UNION','INTERSECTION','DIFFERENCE','SYMMETRIC_DIFFERENCE','ROTATE','MIRROR','TRANSLATE'].includes(kind)) return 'copycat'

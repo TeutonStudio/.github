@@ -6,7 +6,9 @@ import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { inspectorContext, wireModels, editNativeGroup, groupInterfaceContext, editGroupInterface } from './generated/engine.mjs'
 
 import { contract, getPath, inspectorFields, setPath } from './inspector-model.js'
+import { TransformationFields } from './TransformationFields.jsx'
 import { TransformValues } from './TransformValues.jsx'
+import { WallThicknessFields } from './WallThicknessFields.jsx'
 import { ArrangementGrid } from './ArrangementGrid.jsx'
 import { model } from './model.js'
 import { MaterialField } from './Workspace.jsx'
@@ -17,7 +19,7 @@ const Context = createContext({})
 const choiceLabels = { SQUARE:'Quadrat', RECTANGLE:'Rechteck', DRAW:'Anklicken', OVERLAY:'Vier Rotationen überlagern', ADJACENT:'Rotiert aneinander · 2×2 Blöcke', SEPARATED: 'Separiert', GROUPED: 'Gruppiert', NORMAL: 'Lokale Normale', FOOTPRINT: 'Aus Grundriss', SEGMENTS: 'Aus Segmenten', FLAT: 'Flachdach', PENT: 'Pultdach', GABLE: 'Satteldach', HIP: 'Walmdach', MANSARD: 'Mansarddach', HEIGHT: 'Firsthöhe', ANGLE: 'Dachneigung', rooms: 'Aus Räumen', walls: 'Aus Wänden', horizontal: 'Horizontal', vertical: 'Vertikal', depth: 'Tiefe', transform: 'Frei anordnen', flat: 'Flachdach', gable: 'Satteldach', AUTO: 'Automatisch', EXPLICIT: 'Explizit', OPEN: 'Offen', BOUNDARY: 'Raumgrenze', OPENING: 'Öffnung', STRUCTURE: 'Tragwerk', DECORATION: 'Dekoration' }
 const labels = {
   columnMode: 'Säulenaufbau', countValue: 'Anzahl', roofType: 'Dachart', ridge: 'Firstrichtung', overhang: 'Dachüberhang', coordinates: 'Koordinaten', layoutCells: 'Zellenbelegung', assembly: 'Expliziter Aufbau', depth: 'Tiefe',
-  regionCopies: 'Copycats je Bereich', roofLevel: 'Dachebene', roofConfig: 'Dachaufbau', levelIds: 'Geschosskennungen',
+  roofSections:'Dachflächen', config:'Dachparameter', regionCopies: 'Copycats je Bereich', roofLevel: 'Dachebene', roofConfig: 'Dachaufbau', levelIds: 'Geschosskennungen',
   stairwell: 'Treppenhaus', elevatorShaft: 'Aufzugsschacht', serviceShaft: 'Installationsschacht',
   accessInstances: 'Vertikale Erschließung', roomLayout: 'Raumanordnung', roomConfig: 'Raumaufbau', facade: 'Fassade',
   features: 'Öffnungen und Erweiterungen', attachments: 'Wandanschlüsse', bayWindow: 'Erker', dormer: 'Gaube',
@@ -44,7 +46,7 @@ function initial(type) {
   if (type === 'Boolean') return false
   if (models.enums[type]) return models.enums[type][0]
   const value = structuredClone(models[type]?.default ?? 0)
-  if (value && typeof value === 'object' && (value.id === '' || type === 'RoofTemplateFamily')) value.id = crypto.randomUUID()
+  if (value && typeof value === 'object' && (value.id === '' || ['RoofTemplateFamily','RoofSection'].includes(type))) value.id = crypto.randomUUID()
   return value
 }
 function args(type) {
@@ -94,6 +96,7 @@ function Value({ type, value, change, title, path = '', settings = {} }) {
     if (path === 'role') return pick(Object.keys(context.palette || {}).map(value => ({ value, label: ({ wall: 'Wand', frame: 'Rahmen', glass: 'Glas', roof: 'Dach', gable: 'Giebel', trim: 'Zierleiste' })[value] || value })))
     if (path === 'finish') return pick([{ value: '', label: 'Kein Belag' }, ...context.carpets])
   }
+  if (path === 'roomConfig.wallThickness' || path === 'facade.thickness') return <WallThicknessFields {...{path,value,change,context}} />
   if (optional) return <div className="native-optional">
     <label className="check"><input type="checkbox" checked={value != null} onChange={event => change(event.target.checked ? initial(base) : null)} />{title}</label>
     {value != null && <Value {...{ value, change, title, path, settings }} type={base} />}
@@ -130,7 +133,7 @@ function Value({ type, value, change, title, path = '', settings = {} }) {
     const horizontalPoint = type === 'P' && (['buildingOffset', 'landscapeOffset'].includes(path) || /^accessInstances\.\d+\.position$/.test(path) || /^offsets\.\d+$/.test(path) && ['STOREY', 'BUILDING'].includes(context.node?.kind) || /^coordinates\.\d+$/.test(path) && ['AREA', 'ROOM_GEOMETRY', 'GARDEN'].includes(context.node?.kind))
     if (horizontalPoint) fields = fields.filter(([key]) => key !== 'y')
     if (type === 'RoofLevelConfig') fields = fields.filter(([key]) => !(['upperSlope', 'breakRatio'].includes(key) && object.form !== 'MANSARD') && !(key === 'height16' && object.mode !== 'HEIGHT') && !(key === 'knee16' && object.mode !== 'ANGLE'))
-    return <fieldset className={type === 'P' ? 'coordinate-grid' : undefined} style={type === 'P' ? {'--coordinate-count':fields.length} : undefined}><legend>{title}</legend>{fields.filter(([key]) => !(context.group && key === 'id')).map(([key, field]) =>
+    return <fieldset className={type === 'P' ? 'coordinate-grid' : undefined} style={type === 'P' ? {'--coordinate-count':fields.length} : undefined}><legend>{title}</legend>{fields.filter(([key]) => !((context.group || type==='RoofSection') && key === 'id')).map(([key, field]) =>
       <Value key={key} type={field} path={path ? `${path}.${key}` : key} settings={contract.structures?.[type]?.[key]} value={object[key] ?? models[type].default?.[key]} title={label(key)} change={next => change({ ...object, [key]: next })} />)}</fieldset>
   }
   if(type==='CopycatMirrorPlane') return <MirrorPlanePicker label={title} value={value || 'X'} onChange={change}/>
@@ -165,7 +168,7 @@ const formWidgets = {
 export function NativeFields({ mode, node, edit, document, library, onInspectNode }) {
   const [draft, setDraft] = useState(() => structuredClone(node))
   useEffect(() => setDraft(structuredClone(node)), [JSON.stringify(node)])
-  const fields = inspectorFields(mode, node).filter(field=>!(draft.dynamicAxes?.length && ['module','block'].includes(field.path))).filter(field => !(['INPUT','SAVED','COPYCAT'].includes(node.kind) && ['rotationAxis','quarterTurns','rotationPivot','translation','offset','turn','tilt','spin','top','part.top'].includes(field.path))).filter(field => !['rotationPivot','translation'].includes(field.path)).filter(field => !(mode === 'form' && formWidgets[node.kind]?.includes(field.path)))
+  const fields = inspectorFields(mode, node).filter(field=>!(draft.dynamicAxes?.length && ['module','block'].includes(field.path))).filter(field => !(['INPUT','SAVED','COPYCAT'].includes(node.kind) && ['rotationAxis','quarterTurns','rotationPivot','translation','offset','turn','tilt','spin','top','part.top'].includes(field.path))).filter(field => !(['rotationPivot','translation'].includes(field.path) || field.path==='roofSections' && (!model.directAreas || draft.roofSections==null) || draft.roofSections!=null && ['roofType','ridge','overhang'].includes(field.path))).filter(field => !(mode === 'form' && formWidgets[node.kind]?.includes(field.path)))
   const context = useMemo(() => {
     if (mode !== 'building') return { mode, library, node: draft, slopes: model.roofSlopes }
     try {
@@ -174,6 +177,7 @@ export function NativeFields({ mode, node, edit, document, library, onInspectNod
     } catch { return { mode, library, node: draft, references: {}, carpets: [] } }
   }, [mode, document, library, draft])
   if(node.resultType) return null
+  if(node.kind==='TRANSFORMATION') return <TransformationFields node={node} edit={edit} mode={mode}/>
   if(mode==='building' && node.kind==='AREA') {let area;try{area=areaGraph(document,node.id)}catch{};return <section><AreaControls node={node} model={area} edit={edit}/><p className="hint">Die Fläche wird in der 2D-Vorschau bearbeitet. Quadrat: ein Anzahlanschluss; Rechteck: zwei; Anklicken: keine Eingänge.</p></section>}
   if (mode === 'building' && ['ROTATION', 'MIRRORING'].includes(node.kind)) return <TransformValues {...{ node, edit }} />
   if (!fields.length) return null
@@ -181,6 +185,7 @@ export function NativeFields({ mode, node, edit, document, library, onInspectNod
   const patch = (path, next) => setDraft(setPath(draft, path, next))
   return <Context.Provider value={context}><details open className="native-fields"><summary>{mode === 'building' ? 'Knoteneinstellungen' : 'Ausrichtung und Formeinstellungen'}</summary>
     {node.kind==='SEGMENT' && draft.dynamicAxes?.length>0 && <p className="hint">Dynamische Achsen werden erst vom verwendenden Raum oder Dach aufgelöst. Die eingestellten Maße dienen als Vorschau. Ein Copycat-Eingang belegt das gesamte Innere; Flächen-, Kanten- und Eckanschlüsse entfallen.</p>}
+    {node.kind==='ROOF' && draft.roofSections!=null && <p className="hint">Flächen direkt am Dach anschließen. Jede Dachfläche besitzt eigene Einstellungen und einen Geschossbezug; ohne Fläche wird die freiliegende Geschossfläche verwendet.</p>}
     {node.kind==='ROOF' && node.adaptiveRoof && <p className="hint">Das Dach ermittelt Fläche, First sowie innere und äußere Ecken automatisch. Dynamische Segmente erhalten die benötigten Maße. Ohne Vorlage wird die entsprechende Dachgeometrie erzeugt.</p>}
     {node.kind === 'ROTATION_SEGMENT' && <p className="hint">{draft.columnMode==='ADJACENT'?'Vier um Y gedrehte Copycats bilden eine Lage mit 2×2 Blöcken. Die Länge bestimmt die Anzahl der Lagen.':'Die Copycat wird bei 0°, 90°, 180° und 270° um Y vereinigt. Die Länge wiederholt dieses Profil entlang Y zur Säule.'}</p>}
     {(draft.kind === 'ROOF' && !draft.assembly && draft.roofType === 'gable' || draft.kind === 'ROOF_LEVEL' && ['GABLE', 'CROSS', 'PENT'].includes(draft.roofLevel?.form)) && <p className="hint">Die Dachverlängerung wächst entlang des Firsts über die Giebelseiten hinaus. Dachbreite und Mauern bleiben am Gebäudegrundriss.</p>}
@@ -192,9 +197,9 @@ export function NativeFields({ mode, node, edit, document, library, onInspectNod
       }}><option value="_solid">Massive Wand</option><option value="_air">Leere Wand</option>{Object.entries(library?.modules || {}).map(([id, item]) => <option key={id} value={id}>{item.name || id}</option>)}</select></label>
         : field.path === 'block' && node.kind === 'SEGMENT' ? null
         : field.path === 'surfaces' ? <fieldset><legend>Materialgruppen</legend>{groups.map(group => <MaterialField key={group.id} blockOnly label={group.name} value={draft.surfaces?.[group.id] || context.palette?.[group.role === 'surface' ? draft.role : group.role] || ''} onChange={value => patch('surfaces', Object.fromEntries(groups.map(item => [item.id, item.id === group.id ? value : draft.surfaces?.[item.id] || context.palette?.[item.role === 'surface' ? draft.role : item.role] || 'minecraft:stone'])))} />)}<button type="button" onClick={() => patch('surfaces', null)}>Gebäudepalette verwenden</button></fieldset>
-        : <Value type={field.type} value={getPath(draft, field.path)} path={field.path} settings={field} title={label(field.path.split('.').at(-1))} change={next => patch(field.path, next)} />}
+        : <Value type={field.path==='roofSections'?'List<RoofSection>':field.type} value={getPath(draft, field.path)} path={field.path} settings={field.path==='roofSections'?{...field,maxItems:16}:field} title={label(field.path.split('.').at(-1))} change={next => patch(field.path, next)} />}
     </div>)}
-    {(node.kind === 'PATTERN' || node.kind === 'SEGMENT_UNION' || node.kind === 'STOREY' && node.storeyMode === 'rooms') && <ArrangementGrid {...{ node, document, library, edit }} />}
+    {(node.kind === 'STOREY' && node.storeyMode === 'rooms') && <ArrangementGrid {...{ node, document, library, edit }} />}
     <button type="button" className="primary" disabled={JSON.stringify(draft) === JSON.stringify(node)} onClick={() => edit(Object.fromEntries(fields.map(field => field.path.split('.')[0]).map(key => [key, draft[key]])))}>Übernehmen</button>
   </details></Context.Provider>
 }

@@ -45,7 +45,7 @@ export function validateReferences(document, library = {}) {
 const canonical = value => value && typeof value === 'object' ? Array.isArray(value) ? value.map(canonical) : Object.fromEntries(Object.keys(value).sort().map(key => [key,canonical(value[key])])) : value
 export function mergeVersions(current, incoming) {
   const result=current.map(migrateEntry)
-  const payload = entry => {const {savedAt,...value}=migrateEntry(entry);return JSON.stringify(canonical(value))}
+  const payload = entry => {const {savedAt,name,...value}=migrateEntry(entry);return JSON.stringify(canonical(value))}
   for (const value of incoming) {
     const entry=migrateEntry(value)
     const previous=result.find(item => item.id === entry.id || identityOf(item) === identityOf(entry) && item.version === entry.version)
@@ -54,4 +54,30 @@ export function mergeVersions(current, incoming) {
   }
   if(result.length > 500) throw new Error('Die zusammengeführte Bibliothek überschreitet 500 Speicherstände.')
   return result
+}
+
+// A name belongs to the document identity, while geometry remains versioned.
+export function validDocumentName(value) {
+  const name = value.trim()
+  if (!name || name.length > 64 || /[\x00-\x1f]/.test(name)) throw new Error('Der Name benötigt 1–64 sichtbare Zeichen.')
+  return name
+}
+export function documentName(workspace, identity, fallback = 'Graph') {
+  if (!identity) return fallback
+  return (typeof workspace.documentNames?.[identity] === 'string' ? workspace.documentNames[identity] : null)
+    || [...workspace.graphs, ...workspace.nodeGroups].filter(entry => identityOf(entry) === identity)
+      .sort((a,b) => (b.version || 1) - (a.version || 1))[0]?.name
+    || fallback
+}
+export function renameDocument(workspace, identity, value) {
+  const name = validDocumentName(value)
+  if (!identity || workspace.documentNames?.[identity] === name) return workspace
+  return {...workspace, documentNames: {...workspace.documentNames, [identity]: name}}
+}
+export function namedWorkspace(workspace) {
+  const named = entry => {
+    const name = documentName(workspace, identityOf(entry), entry.name)
+    return name === entry.name ? entry : {...entry, name}
+  }
+  return {...workspace, graphs:workspace.graphs.map(named), nodeGroups:workspace.nodeGroups.map(named)}
 }

@@ -13,7 +13,7 @@ internal object GraphModels {
     val building=Model(catalog.building)
     val operators:Map<String,UnifiedOperators.Family> = names(catalog.operators).associateWith { kind ->
         val f=catalog.operators[kind]
-        UnifiedOperators.Family(f.label as String,f.description as String,f.output as String,f.default as String,names(f.operations).associateWith { key -> val op=f.operations[key];UnifiedOperators.Operation(op.label as String,op.description as String,list(op.types).map { it as String },op.min as Int,op.max as Int,list(op.optional).map { it as Int }) })
+        UnifiedOperators.Family(f.label as String,f.description as String,f.output as String,f.default as String,names(f.operations).associateWith { key -> val op=f.operations[key];UnifiedOperators.Operation(op.label as String,op.description as String,list(op.types).map { it as String },op.min as Int,op.max as Int,list(op.optional).map { it as Int },op.commutativeAssociative==true) })
     }
     val coordinates=-8192..8192
     const val FORM_NODES=64
@@ -38,7 +38,7 @@ internal object GraphModels {
         return value
     }
     fun newShape(kind:NodeKind):GraphNode = decodeGraphNode(defaults(catalog.copycat,kind.name,catalog.copycat.nodes[kind.name].defaults))
-        .let { n->n.copy(inputs=List(if(kind==NodeKind.MIRROR) 2 else if(kind==NodeKind.POSITION) 3 else UnifiedOperators.shapeInputs(n).min) { "" }) }
+        .let { n->n.copy(inputs=List(if(kind in setOf(NodeKind.MIRROR,NodeKind.UNION,NodeKind.INTERSECTION)) 2 else if(kind==NodeKind.POSITION) 3 else UnifiedOperators.shapeInputs(n).min) { "" }) }
     fun newBuilding(kind:BuildingKind,explicit:Boolean):BuildingNode {
         val model=catalog.building.nodes[kind.name]
         return decodeBuildingNode(defaults(catalog.building,kind.name,if(explicit || model.alwaysExplicit==true) model.defaults else model.legacyDefaults))
@@ -71,6 +71,9 @@ internal object GraphModels {
         val nodes=names(value.nodes).associateWith { NodeModel(value.nodes[it]) }
     }
     class NodeModel(value:dynamic) {
+        val algebraAvailable=value.commutativeAssociative!=null || value.commutative!=null && value.associative!=null
+        // Older pinned catalogs expose the two mathematical flags separately.
+        val commutativeAssociative=if(value.commutativeAssociative!=null) value.commutativeAssociative==true else value.commutative==true && value.associative==true
         val output=value.output?.unsafeCast<String>()
         val inputs=if(value.inputs==null) null else ShapeInputs(value.inputs)
         val ports=list(value.ports).map(::BuildingPortModel)

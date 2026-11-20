@@ -52,6 +52,12 @@ fun graphModels(): Json = json(
     "operators" to JSON.parse<dynamic>(graphCatalogJson).operators,"cardTypes" to GraphCards.types.toTypedArray(),"release" to graphRelease,"catalogSha256" to graphCatalogHash,
     "copycatSchemas" to GraphModels.copycat.graphSchemas.toTypedArray(),
     "buildingSchemas" to GraphModels.building.graphSchemas.toTypedArray(),
+    "inputEditing" to graphInputEditingAvailable,"directAreas" to graphDirectAreasAvailable,
+    "nodeProperties" to json("form" to json(*browserFormKinds.map { kind ->
+        val spec=GraphModels.shape(kind);kind.name to json("commutativeAssociative" to spec.commutativeAssociative,"available" to spec.algebraAvailable)
+    }.toTypedArray()),"building" to json(*browserBuildingKinds.map { kind ->
+        val spec=GraphModels.building.nodes.getValue(kind.name);kind.name to json("commutativeAssociative" to spec.commutativeAssociative,"available" to spec.algebraAvailable)
+    }.toTypedArray())),
     "form" to browserFormKinds.map { kind -> json("kind" to kind.name,
         "min" to GraphModels.inputs(kind).first, "max" to GraphModels.inputs(kind).last) }.toTypedArray(),
     "building" to browserBuildingKinds.map { it.name }.toTypedArray(),
@@ -79,7 +85,7 @@ private fun inspectBuilding(n:BuildingNode,graph:BuildingGraph):Json=json("dynam
     "ports" to BuildingPorts.of(n,graph,true).map { port -> json("id" to port.key,"source" to port.source,"accepts" to port.accepts.map { it.name }.toTypedArray(),
         "types" to port.accepts.map(::buildingGraphType).distinct().toTypedArray(),"length" to port.length,"height" to port.height) }.toTypedArray())
 private fun inspectShape(value:GraphNode):Json { val n=value.withValueSockets();return json("node" to value.jsNode(),"outputType" to GraphModels.shape(n.kind).output,
-    "ports" to n.inputs.mapIndexed { index,source -> json("id" to index.toString(),"source" to source,"types" to arrayOf(UnifiedOperators.shapeInputs(n).type(index)),
+    "ports" to shapeInputSlots(n).map { index -> json("id" to index.toString(),"source" to n.inputs[index],"types" to arrayOf(UnifiedOperators.shapeInputs(n).type(index)),
         "accepts" to browserFormKinds.filter { GraphModels.shape(it).output==UnifiedOperators.shapeInputs(n).type(index) }.map { it.name }.toTypedArray()) }.toTypedArray()) }
 
 @JsExport
@@ -229,7 +235,7 @@ fun previewGraph(isBuilding: Boolean, document: dynamic, library: dynamic, selec
         if(n.kind in CopycatTransforms.valueKinds) {
             GraphCompiler.structure(graph,original.groups)
             return json("count" to 0, "raw" to 0, "meshes" to emptyArray<Json>(),
-            "value" to when { n.kind.name in UnifiedOperators.valueKinds->UnifiedOperators.value(UnifiedOperators.valueNodes(graph.nodes),n.id).toString();n.kind.name in GraphValues.vectorKinds->"Position: ${GraphValues.shape(graph.nodes.associateBy { it.id }).vector(n.id)} hB";n.kind.name in GraphValues.integerKinds->"Anzahl: ${GraphValues.shape(graph.nodes.associateBy { it.id }).integer(n.id)}";n.kind==NodeKind.MIRRORING->"Spiegelung: ${(n.mirror ?: CopycatMirror()).plane}";else->"${n.rotationAxis.name}: ${n.quarterTurns*90}°" }, "warnings" to arrayOf("Parameterwert, keine Geometrie"))
+            "value" to when { n.kind.name in UnifiedOperators.valueKinds->UnifiedOperators.value(UnifiedOperators.valueNodes(graph.nodes),n.id).toString();n.kind.name in GraphValues.vectorKinds->"Position: ${GraphValues.shape(graph.nodes.associateBy { it.id }).vector(n.id)} hB";n.kind.name in GraphValues.integerKinds->"Anzahl: ${GraphValues.shape(graph.nodes.associateBy { it.id }).integer(n.id)}";n.kind.name=="TRANSFORMATION"->shapeTransformationDescription(n,graph);n.kind==NodeKind.MIRRORING->"Spiegelung: ${(n.mirror ?: CopycatMirror()).plane}";else->"${n.rotationAxis.name}: ${n.quarterTurns*90}°" }, "warnings" to arrayOf("Parameterwert, keine Geometrie"))
         }
         val parts = if(selected.isEmpty()) GraphCompiler.compile(graph,original.groups) else GraphCompiler.intermediate(graph,n.id,original.groups)
         val filter = if(n.kind==NodeKind.OUTPUT) n.previewGroup else ""
@@ -254,9 +260,9 @@ fun previewGraph(isBuilding: Boolean, document: dynamic, library: dynamic, selec
         BuildingGraphCompiler.structure(graph)
         return json("count" to 0,"raw" to 0,"meshes" to emptyArray<Json>(),"value" to if(selectedNode!!.kind.name in GraphValues.integerKinds) "Anzahl: ${GraphValues.building(graph.nodes.associateBy { it.id }).integer(selectedNode.id)}" else "Position: ${GraphValues.building(graph.nodes.associateBy { it.id }).vector(selectedNode.id)} hB")
     }
-    if(selectedNode?.kind in setOf(BuildingKind.ROTATION,BuildingKind.MIRRORING,BuildingKind.POSITION)) {
+    if(selectedNode?.kind?.name in setOf("ROTATION","MIRRORING","POSITION","TRANSFORMATION")) {
         BuildingGraphCompiler.structure(graph)
-        val value=if(selectedNode!!.kind==BuildingKind.POSITION) "Versatz: ${selectedNode.translation}" else if(selectedNode.kind==BuildingKind.ROTATION) selectedNode.rotations.orEmpty().joinToString(" → ") { "${it.axis}: ${it.quarterTurns*90}°" } else selectedNode.mirrors.orEmpty().joinToString(" → ") { it.plane.name }
+        val value=if(selectedNode!!.kind.name=="TRANSFORMATION") buildingTransformationDescription(selectedNode,graph) else if(selectedNode.kind==BuildingKind.POSITION) "Versatz: ${selectedNode.translation}" else if(selectedNode.kind==BuildingKind.ROTATION) selectedNode.rotations.orEmpty().joinToString(" → ") { "${it.axis}: ${it.quarterTurns*90}°" } else selectedNode.mirrors.orEmpty().joinToString(" → ") { it.plane.name }
         return json("count" to 0,"raw" to 0,"meshes" to emptyArray<Json>(),"value" to value.ifEmpty { "Identität (leere Liste)" })
     }
     val plan = if(cardTarget.isEmpty()) BuildingGraphCompiler.compile(b,forms,modules).plan
@@ -277,7 +283,10 @@ fun previewGraph(isBuilding: Boolean, document: dynamic, library: dynamic, selec
 }
 
 @JsExport
-fun starterBuilding():Json=encodeBuilding(Building(schema=2,name="Neues Gebäude",graph=BuildingGraph.explicitStarter()))
+fun starterBuilding():Json=encodeBuilding(Building(schema=2,name="Neues Gebäude",graph=authoringStarter()))
+
+@JsExport
+fun authoringBuildingNode(value:dynamic):Json=encodeBuildingNode(authoringNode(decodeBuildingNode(value)))
 
 @JsExport
 fun sourceMounting(value:dynamic):String = directionName(PartRotations.normal(part(value)))
@@ -324,18 +333,35 @@ fun arrangementGraph(document:dynamic,library:dynamic,selected:String,view:Strin
             "items" to node.inputs.mapIndexed { i,id -> json("id" to id,"label" to graph.nodes.first { it.id==id }.let { it.name.ifBlank { id } },
                 "cells" to draft.projected(i,plane).map { arrayOf(it.x,it.z) }.toTypedArray()) }.toTypedArray())
     }
-    if(node.kind==BuildingKind.SEGMENT_UNION) return json("items" to node.inputs.mapIndexed { i,id ->
-        val offset=node.offsets.getOrNull(i) ?: P()
-        json("id" to id,"label" to graph.nodes.first { it.id==id }.let { it.name.ifBlank { id } },
-            "cells" to evaluation.segment(id).cells.filter { !it.cell.empty && it.cell.block!="minecraft:air" }.map { plane.project(it.cell.pos+offset) }.toSet().map { arrayOf(it.x,it.z) }.toTypedArray())
-    }.toTypedArray())
+    if(node.kind==BuildingKind.SEGMENT_OPERATOR || node.kind in SegmentBooleans.kinds || node.kind in setOf(BuildingKind.SEGMENT_ROTATE,BuildingKind.SEGMENT_MIRROR,BuildingKind.SEGMENT_TRANSFORM)) {
+        val editable=SegmentBooleans.arrangeable(node)
+        val ids=if(editable) node.inputs else node.inputs.take(1)+node.id
+        val items=ids.mapIndexed { i,id ->
+            val offset=if(editable) operandOffset(node,i) else P()
+            var problem:String?=null
+            val cells=try {
+                require(id.isNotEmpty()) { "Eingang ${i+1} verbinden" }
+                evaluation.segment(id).cells.filter { !it.cell.empty && it.cell.block!="minecraft:air" }
+                    .map { plane.project(it.cell.pos+offset) }.toSet().map { arrayOf(it.x,it.z) }.toTypedArray()
+            } catch(cause:Throwable) { problem=cause.message ?: "Quelle noch nicht bereit";emptyArray<Array<Int>>() }
+            json("id" to id,"slot" to i,"label" to (if(!editable && i==1) "Ergebnis" else graph.nodes.firstOrNull { it.id==id }?.let { it.name.ifBlank { id } } ?: "Eingang ${i+1}"),
+                "offset" to offset.jsPoint(),"error" to problem,"cells" to cells)
+        }
+        return json("items" to items.toTypedArray(),"editable" to editable)
+    }
     require(node.kind==BuildingKind.STOREY && node.storeyMode=="rooms") { "Select a segment pattern or storey made from rooms" }
-    return json("items" to node.inputs.mapIndexed { i,id ->
-        val plan=evaluation.preview(id)
-        val offset=node.offsets.getOrNull(i) ?: P()
-        json("id" to id,"label" to graph.nodes.first { it.id==id }.let { it.name.ifBlank { id } },
-            "cells" to plan.placements.map { plane.project(it.pos+offset) }.toSet().map { arrayOf(it.x,it.z) }.toTypedArray())
-    }.toTypedArray())
+    val areas=node.inputs.mapIndexed { i,id -> RoomArrangementArea.of(i,graph.nodes.first { it.id==id },evaluation.room(id),node.offsets.getOrNull(i) ?: P()) }
+    var conflicts=RoomArrangement.conflicts(areas)
+    var pending:String?=null
+    if(conflicts.isEmpty()) try { evaluation.storey(node.id) }
+    catch(error:InvalidRoomArrangement) { conflicts=error.conflicts }
+    catch(error:Throwable) { pending=error.message ?: "Quellen vervollständigen" }
+    fun cells(points:Collection<P>)=points.map { plane.project(it) }.toSet().map { arrayOf(it.x,it.z) }.toTypedArray()
+    return json("items" to areas.map { area -> json("id" to node.inputs[area.index],"label" to area.label,
+        "cells" to cells(area.interior),"walls" to cells(area.walls)) }.toTypedArray(),
+        "pending" to pending,"conflicts" to conflicts.map { c -> json("kind" to c.kind.name,
+            "first" to c.first.index,"second" to c.second.index,"firstLabel" to c.first.label,"secondLabel" to c.second.label,
+            "cells" to cells(c.cells)) }.toTypedArray())
 }
 
 @JsExport
@@ -397,7 +423,7 @@ fun inspectorContext(document:dynamic,id:String):Json {
             runCatching { GraphGroups.remap(decodeBuildingNode(probe)) { key,source -> if(source=="__inspector_probe__") reference=key;source } }
             reference?.let { key ->
                 val kinds=ports.firstOrNull { it.key==key }?.accepts ?: when {
-                    key=="template:wall"->setOf(BuildingKind.SEGMENT,BuildingKind.PATTERN,BuildingKind.SEGMENT_ROTATE,BuildingKind.SEGMENT_MIRROR)+SegmentBooleans.kinds
+                    key=="template:wall"->setOf(BuildingKind.SEGMENT,BuildingKind.PATTERN,BuildingKind.SEGMENT_ROTATE,BuildingKind.SEGMENT_MIRROR)+BuildingKind.entries.filter { it.name=="SEGMENT_TRANSFORM" }+SegmentBooleans.kinds
                     key.startsWith("template:") || key.startsWith("family:")->CopycatBooleans.sourceKinds
                     else->emptySet()
                 }
@@ -411,13 +437,24 @@ fun inspectorContext(document:dynamic,id:String):Json {
     when(node.kind) {
         BuildingKind.ROTATION_SEGMENT->source(node.dimensions.orEmpty()["length"].orEmpty(),"length")
         BuildingKind.AREA->{source(node.dimensions.orEmpty()["length"].orEmpty(),"length");source(node.dimensions.orEmpty()["height"].orEmpty(),"height")}
-        BuildingKind.SEGMENT->if(node.dynamicAxes.isNullOrEmpty()) source(node.layout,"length","height","depth")
+        BuildingKind.SEGMENT->if(node.dynamicAxes.isNullOrEmpty()) {
+            if(graph.nodes.firstOrNull { it.id==node.layout }?.kind==BuildingKind.AREA) source(node.layout,"length","height")
+            else source(node.layout,"length","height","depth")
+        }
         BuildingKind.SEGMENT_LAYOUT->source(node.geometry,"length","height")
         BuildingKind.ROOM_GEOMETRY->source(node.geometry,"coordinates")
-        BuildingKind.ROOM->if(node.assembly) source(node.geometry,"height","rectangles")
+        BuildingKind.ROOM->if(node.assembly) {
+            if(graph.nodes.firstOrNull { it.id==node.geometry }?.kind==BuildingKind.AREA) source(node.geometry,"rectangles")
+            else source(node.geometry,"height","rectangles")
+        }
         else->Unit
     }
-    return json("palette" to b.palette.asJson(),"references" to references,"derived" to derived,"resolved" to encodeBuildingNode(graph.resolvedNode(node)),
+    val wallSections=if(node.kind!=BuildingKind.ROOM) emptyList() else if(node.roomConfig?.mode==RoomMode.SEGMENTS) {
+        val config=graph.nodes.firstOrNull { it.id==node.layout }?.roomLayout
+        config?.instances.orEmpty().filter { it.contribution in setOf(RoomContribution.BOUNDARY,RoomContribution.OPENING) }.map { json("key" to "wall:${it.id}","label" to it.id) }+
+            config?.boundary.orEmpty().indices.map { json("key" to "boundary:$it","label" to "Grenzabschnitt ${it+1}") }
+    } else RoomWallJoints.runs(graph.resolvedNode(node)).map { json("key" to "wall:${it.id}","label" to "${listOf("Norden","Osten","Süden","Westen")[it.direction]} · ${it.id}") }
+    return json("wallSections" to wallSections.toTypedArray(),"palette" to b.palette.asJson(),"references" to references,"derived" to derived,"resolved" to encodeBuildingNode(graph.resolvedNode(node)),
         "storeys" to graph.storeyInstances().map { json("value" to it.id,"label" to "${it.level}: ${graph.nodes.first { n->n.id==it.source }.name.ifBlank { it.source }}") }.toTypedArray(),
         "slopes" to RoofSlope.presets.map { json("p" to it.p,"q" to it.q) }.toTypedArray(),
         "surfaceBlocks" to LandscapeGeometry.surfaceBlocks.toTypedArray(),"groundBlocks" to LandscapeGeometry.groundBlocks.toTypedArray(),"fenceBlocks" to LandscapeGeometry.fenceBlocks.toTypedArray())
@@ -542,4 +579,15 @@ fun cardForm(document:dynamic,library:dynamic):Json {
     val placement=plan.placements.firstOrNull()
     val value=Geometry.validate(Form(name=b.name,parts=placement?.parts.orEmpty(),groups=placement?.groups ?: DEFAULT_GROUPS))
     return json("form" to encodeForm(value),"materials" to placement?.surfaces.orEmpty().asJson())
+}
+
+
+/** Socket order is native graph data, never a cosmetic wire reorder. */
+@JsExport
+fun editGraphInputs(isBuilding:Boolean,document:dynamic,id:String,order:Array<Int>):Json = if(isBuilding) {
+    val changed=updateBuildingInputs(buildingGraph(document.graph),id,order.toList())
+    BuildingGraphCompiler.structure(changed);encodeBuildingGraph(changed)
+} else {
+    val changed=updateShapeInputs(formGraph(document.graph),id,order.toList())
+    GraphCompiler.structure(changed,groups(document));encodeNodeGraph(changed)
 }

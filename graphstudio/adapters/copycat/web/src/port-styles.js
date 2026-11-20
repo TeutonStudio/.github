@@ -1,9 +1,9 @@
 import { editorContract } from './generated/engine.mjs'
 export const portStyles = editorContract().portStyles
 export function semanticType(raw = '') {
-  if(portStyles[raw])return raw
+  if (Object.hasOwn(portStyles,raw)) return raw
   if (raw === 'shape' || raw === 'COPYCAT' || raw.startsWith('COPYCAT_')) return 'shape'
-  if (['rotation', 'mirroring', 'position'].includes(raw.toLowerCase())) return raw.toLowerCase()
+  if (['rotation', 'mirroring', 'position', 'transformation'].includes(raw.toLowerCase())) return raw.toLowerCase()
   if (raw === 'BOOLEAN') return 'BOOLEAN'
   if (raw === 'INT') return 'INT'
   if (raw.startsWith('SEGMENT') || ['WALL', 'PATTERN', 'FLOOR', 'CEILING', 'ROTATION_SEGMENT'].includes(raw)) return 'segment'

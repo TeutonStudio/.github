@@ -53,10 +53,10 @@ export function moveViewNodes(document,groups,moved) {
 }
 function reference(entry) {return {documentId:identityOf(entry),version:entry.version || 1,name:entry.name,collection:entry.collection || 'graphs'}}
 function scopeLibrary(entry,namespace,currentLibrary) {
-  const scalarTypes=new Set(['INT','POSITION','ROTATION','MIRRORING','BOOLEAN'])
+  const scalarTypes=new Set(['INT','POSITION','ROTATION','MIRRORING','BOOLEAN','TRANSFORMATION'])
   const result=entry.document?.graph?.nodes.find(node=>node.resultType)
   const scalar=entry.collection==='nodeGroups'
-    ? entry.graphInterface?.outputs?.length ? entry.graphInterface.outputs.every(output=>scalarTypes.has(output.type)) : entry.nodes?.length && entry.nodes.every(node=>/^(INT|POSITION|NUMBER_OPERATOR|RELATION_OPERATOR|STATEMENT_OPERATOR)(_|$)/.test(node.kind) || ['ROTATION','MIRRORING'].includes(node.kind))
+    ? entry.graphInterface?.outputs?.length ? entry.graphInterface.outputs.every(output=>scalarTypes.has(output.type)) : entry.nodes?.length && entry.nodes.every(node=>/^(INT|POSITION|NUMBER_OPERATOR|RELATION_OPERATOR|STATEMENT_OPERATOR)(_|$)/.test(node.kind) || ['ROTATION','MIRRORING','TRANSFORMATION'].includes(node.kind))
     : scalarTypes.has(result?.resultType)
   const source=entry.library || {},palette=scalar?{}:entry.document?.palette || entry.palette || wireModels().Building.default.palette,roles=Object.fromEntries(Object.keys(palette).map(key=>[key,`${namespace}_${key}`]))
   const formIds=Object.fromEntries(Object.keys(source.forms || {}).map(key=>[key,`${namespace}_${key}`])),moduleIds=Object.fromEntries(Object.keys(source.modules || {}).map(key=>[key,`${namespace}_${key}`]))
@@ -92,6 +92,11 @@ export function previewReferenceEntry(entry,library) {
   }
   return null
 }
+function buildingInputPort(kind,slot) {
+  if(kind==='TRANSFORMATION') return ['mirroring','rotation','positionValue'][slot]
+  if(slot===1) return {ROTATE:'rotation',MIRROR:'mirroring',TRANSLATE:'positionValue',COPYCAT_TRANSFORM:'transformationValue'}[kind] || `in:${slot}`
+  return `in:${slot}`
+}
 export function buildingTemplate(entry) {
   const forms={...(entry.library?.forms || {})},ids=new Map(entry.nodes.map(n=>[n.id,n])), remapKind={INPUT:'COPYCAT',SAVED:'COPYCAT',ROTATE:'COPYCAT_ROTATE',MIRROR:'COPYCAT_MIRROR',TRANSLATE:'COPYCAT_POSITION',UNION:'COPYCAT_UNION',INTERSECTION:'COPYCAT_INTERSECTION',DIFFERENCE:'COPYCAT_DIFFERENCE',SYMMETRIC_DIFFERENCE:'COPYCAT_SYMMETRIC_DIFFERENCE'}
   const nodes=entry.nodes.map(node=>{
@@ -105,17 +110,18 @@ export function buildingTemplate(entry) {
       return {...target,form:key,surfaces:Object.keys(surfaces).length?surfaces:null}
     }
     if(['ROTATE','ROTATION'].includes(node.kind) && node.rotationAxis==='NORMAL' && node.quarterTurns) throw new Error('Die ältere lokale Rotationsachse dieser Gruppe zuerst auf X, Y oder Z umstellen.')
-    const common={...target,name:node.name || "",materialMode:node.materialMode || "SEPARATED",role:node.materialGroup || "wall",inputs:(node.inputs || []).map(()=>''),rotationAxis:node.rotationAxis==='NORMAL'?'Y':node.rotationAxis || 'Y',quarterTurns:node.quarterTurns || 0,rotationPivot:node.rotationPivot,translation:node.translation,countValue:node.countValue,operation:node.operation,numberValue:node.numberValue,comparisonValue:node.comparisonValue,booleanValue:node.booleanValue,copycatTransforms:node.copycatTransforms,mirror:node.mirror}
+    const common={...target,name:node.name || "",materialMode:node.materialMode || "SEPARATED",role:node.materialGroup || "wall",inputs:(node.inputs || []).map(()=>''),rotationAxis:node.rotationAxis==='NORMAL'?'Y':node.rotationAxis || 'Y',quarterTurns:node.quarterTurns || 0,rotationPivot:node.rotationPivot,translation:node.translation,transformationOrder:node.transformationOrder,countValue:node.countValue,operation:node.operation,numberValue:node.numberValue,comparisonValue:node.comparisonValue,booleanValue:node.booleanValue,copycatTransforms:node.copycatTransforms,mirror:node.mirror}
     if(node.kind==='ROTATION') return {...common,inputs:[],rotations:[{axis:common.rotationAxis,quarterTurns:common.quarterTurns}]}
     if(node.kind==='MIRRORING') return {...common,inputs:[],mirrors:[node.mirror || {plane:'X'}]}
-    if(['ROTATE','MIRROR','TRANSLATE'].includes(node.kind)) common.inputs=['']
+    if(['ROTATE','MIRROR','TRANSLATE','COPYCAT_TRANSFORM'].includes(node.kind)) common.inputs=['']
+    if(node.kind==='TRANSFORMATION') common.inputs=[]
     return common
   })
   const wires=entry.wires.map(wire=>{
     const target=ids.get(wire.target),slot=Number(wire.port)
-    return {...wire,port:slot===1 && ['ROTATE','MIRROR','TRANSLATE'].includes(target.kind)?{ROTATE:'rotation',MIRROR:'mirroring',TRANSLATE:'positionValue'}[target.kind]:`in:${slot}`}
+    return {...wire,port:buildingInputPort(target.kind,slot)}
   })
-  const graphInterface=entry.graphInterface && {...entry.graphInterface,inputs:entry.graphInterface.inputs.map(input=>({...input,type:{shape:'COPYCAT',position:'POSITION',rotation:'ROTATION',mirroring:'MIRRORING'}[input.type] || input.type,targets:input.targets.map(target=>({...target,port:Number(target.port)===1 && ['ROTATE','MIRROR','TRANSLATE'].includes(entry.nodes[target.member].kind)?{ROTATE:'rotation',MIRROR:'mirroring',TRANSLATE:'positionValue'}[entry.nodes[target.member].kind]:`in:${target.port}`}))})),outputs:entry.graphInterface.outputs.map(output=>({...output,type:{shape:'COPYCAT',position:'POSITION',rotation:'ROTATION',mirroring:'MIRRORING'}[output.type] || output.type}))}
+  const graphInterface=entry.graphInterface && {...entry.graphInterface,inputs:entry.graphInterface.inputs.map(input=>({...input,type:{shape:'COPYCAT',position:'POSITION',rotation:'ROTATION',mirroring:'MIRRORING',transformation:'TRANSFORMATION'}[input.type] || input.type,targets:input.targets.map(target=>({...target,port:buildingInputPort(entry.nodes[target.member].kind,Number(target.port))}))})),outputs:entry.graphInterface.outputs.map(output=>({...output,type:{shape:'COPYCAT',position:'POSITION',rotation:'ROTATION',mirroring:'MIRRORING',transformation:'TRANSFORMATION'}[output.type] || output.type}))}
   return {...entry,graphInterface,mode:'building',nodes,wires,library:{...(entry.library || {}),forms},palette:{...wireModels().Building.default.palette,...Object.fromEntries((entry.groups || []).map(group=>[group.id,entry.materials?.[group.id] || 'minecraft:stone']))}}
 }
 function insertGroup({mode,document,library,materials,entry,placement}) {

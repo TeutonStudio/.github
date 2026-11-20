@@ -1,5 +1,5 @@
 import { model, inspect, replaceNodes } from './model.js'
-import { newNode } from './generated/engine.mjs'
+import { authoringBuildingNode,newNode } from './generated/engine.mjs'
 import { semanticType } from './port-styles.js'
 export const families=model.operators
 export const symbols={VALUE:'≔',UNION:'∪',INTERSECTION:'∩',DIFFERENCE:'∖',SYMMETRIC_DIFFERENCE:'△',INVERT:'∁',ROTATE:'↻',MIRROR:'↔',TRANSLATE:'↦',ADD:'+',SUBTRACT:'−',MULTIPLY:'×',SCALE:'×',DIVIDE:'÷',REMAINDER:'mod',MIN:'min',MAX:'max',ABS:'| |',EQUAL:'=',NOT_EQUAL:'≠',LESS:'<',LESS_EQUAL:'≤',GREATER:'>',GREATER_EQUAL:'≥',DIVISIBLE:'∣',AND:'∧',OR:'∨',XOR:'⊻',NOT:'¬',IMPLIES:'⇒',EQUIVALENT:'⇔'}
@@ -14,7 +14,7 @@ export function operatorIdentity(node) {
   return null
 }
 export function caption(node) { const o=operatorIdentity(node);return o?`${symbols[o.operation]} ${families[o.family].operations[o.operation].label}`:null }
-export function draftNode(mode,kind) {return newNode(mode==='building',kind,'preview',0,0,true)}
+export function draftNode(mode,kind) {const node=newNode(mode==='building',kind,'preview',0,0,true);return mode==='building'?authoringBuildingNode(node):node}
 export function signature(node) {const o=operatorIdentity(node);return o?families[o.family].operations[o.operation]:null}
 export function switchDraft(mode,node,operation,entries=[]) {
   const {family}=operatorIdentity(node),spec=families[family].operations[operation]
@@ -32,6 +32,12 @@ export function switchDraft(mode,node,operation,entries=[]) {
   })
   const next={...draftNode(mode,family),...node,kind:family,operation,inputs,numberValue:node.numberValue ?? node.countValue ?? 0,translation:node.translation || {x:0,y:0,z:0}}
   for(const key of ['countValue','rotation','mirroring','positionValue','rotations','mirrors','mirrorPositionsOnly'])delete next[key]
+  if(mode==='building' && family==='SEGMENT_OPERATOR') {
+    const values=node.operandOffsets ?? (node.kind==='SEGMENT_UNION'?node.offsets:[]) ?? []
+    next.operandOffsets=['UNION','INTERSECTION','DIFFERENCE','SYMMETRIC_DIFFERENCE'].includes(operation)
+      ? inputs.map((_,i)=>values[Number([...moved].find(([,target])=>target===`in:${i}`)?.[0].replace('in:',''))] ?? {x:0,y:0,z:0}) : null
+    next.offsets=[]
+  }
   // Family switches preserve node identity, placement, names and material settings.
   if(mode==='form')next.inputGroups=inputs.map((_,i)=>node.inputGroups?.[Number([...moved].find(([,v])=>v===`${i}`)?.[0])] || '')
   return {node:next,moved}

@@ -521,6 +521,105 @@ button.danger:hover:not(:disabled),.file-list button.delete-armed {color:#fff;ba
 
 .area-help { margin:0; flex:none; font-size:12px; }
 .area-help summary { cursor:pointer; }
+
+.arrangement-status { padding: .5rem; border: 1px solid currentColor; border-radius: .4rem; }
+.arrangement-status.valid { color: #91d3a6; }
+.arrangement-status.invalid { color: #ffa09a; }
+.arrangement-status p { margin: .3rem 0; font-size: .85rem; }
+
+.node-dialog {width:min(1200px,calc(100vw - 24px));height:min(960px,calc(100dvh - 24px));overflow:hidden}
+.node-dialog[open] {display:flex;flex-direction:column}
+.node-dialog > header,.node-dialog > footer {flex:0 0 auto}
+.node-dialog-content {flex:1;min-height:0;overflow:auto;padding:0 4px 14px 0;scrollbar-gutter:stable}
+.node-picker-toolbar {display:grid;grid-template-columns:2fr repeat(3,minmax(0,1fr));gap:10px}
+.node-picker-toolbar label,.node-picker-filters label {display:grid;gap:4px;min-width:0;font-size:12px}
+.node-picker-toolbar input,.node-picker-toolbar select,.node-picker-filters select {width:100%;min-width:0}
+.node-picker-filters {margin:12px 0}
+.node-picker-filters > div {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:12px 0}
+.node-picker-filters summary,.node-picker-group > summary {cursor:pointer}
+.node-picker-group {margin:18px 0 0}
+.node-picker-group > summary {font-weight:650;margin-bottom:14px}
+.node-catalog {display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;padding:2px 3px}
+.node-catalog-card {padding:14px;text-align:left;border:1px solid #506b75;border-radius:8px;background:#22343e;min-width:0;cursor:grab;touch-action:pan-y}
+.node-catalog-card.is-selected {border-color:var(--mint);outline:2px solid var(--mint);outline-offset:-2px}
+.node-catalog-card:has(:focus-visible) {outline:2px solid var(--mint);outline-offset:2px}
+.node-catalog-select {display:block;width:100%;border:0!important;padding:6px 0!important;background:transparent!important;box-shadow:none;cursor:inherit;text-align:left;touch-action:none}
+.node-catalog-select .node-preview {margin:0 auto}
+.node-operation {padding:7px}
+.node-operation select {width:100%;font:inherit}
+.node-catalog-select:focus-visible {outline:2px solid #91dad4;outline-offset:3px}
+.node-catalog-card > p {line-height:1.5;margin:12px 0;font-size:12px}
+.node-catalog-card > small {display:block;color:var(--muted);font-size:11px;line-height:1.5}
+.preview-socket {position:absolute;width:8px;height:8px;border:1px solid #e3eef2;border-radius:50%;top:50%;transform:translateY(-50%)}
+.preview-socket-source {right:-4px}
+.preview-socket-target {left:-4px}
+.node-dialog > footer {border-top:1px solid #506b75;padding-top:12px;gap:12px;margin-top:0}
+.node-dialog > footer button:last-child {margin-left:auto}
+.node-dialog.is-dragging {visibility:hidden;overflow:visible;pointer-events:none}
+.node-dialog.is-dragging::backdrop {background:transparent}
+.node-drag-preview {position:fixed;visibility:visible;pointer-events:none;opacity:.85;z-index:1}
+@media(max-width:800px) {.node-picker-toolbar {grid-template-columns:repeat(3,minmax(0,1fr))}.node-picker-toolbar label:first-child {grid-column:1/-1}.node-picker-filters > div {grid-template-columns:1fr}}
+@media(max-width:560px) {.node-catalog {grid-template-columns:minmax(0,1fr)}.node-dialog > footer {flex-wrap:wrap}.node-dialog > footer button:last-child {flex:1;font-size:12px}.node-picker-toolbar {grid-template-columns:1fr}.node-picker-toolbar label:first-child {grid-column:auto}}
+
+/* The same compact list owns socket order and its cables. */
+.node-algebra {display:flex;flex-wrap:wrap;gap:6px 14px;margin:8px 0 0;font-size:.75rem;color:var(--muted,#b3c6cd)}
+.node-algebra > div {display:flex;gap:5px}
+.node-algebra dt,.node-algebra dd {margin:0}
+.node-algebra dd {font-weight:700;color:var(--text,#e3eef2)}
+.input-list {min-width:0;margin:8px 0 14px}
+.input-list > header {display:flex;align-items:center;justify-content:space-between;gap:8px}
+.input-list h3 {margin:0;font-size:.95rem}
+.input-list > ol {display:grid;gap:8px;list-style:none;margin:10px 0 0;padding:0}
+.input-list-row {display:grid;grid-template-columns:56px minmax(0,1fr) 30px;gap:8px;align-items:center}
+.input-list-order {display:flex;gap:4px}
+.input-list-row button {min-width:0;padding:5px 0;min-height:32px;width:100%}
+.input-list-order button {width:26px}
+.input-list-row label {min-width:0;margin:0;display:grid;gap:4px}
+.input-list-row select {min-width:0;width:100%;max-width:100%}
+.input-list-remove {color:#f2b4ae}
+@media (max-width:420px) {.input-list-row {gap:5px;grid-template-columns:50px minmax(0,1fr) 26px}.input-list-order button {width:23px}}
+
+.category-color {display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:baseline}
+
+/* Graph actions, material selection and independent orthographic authoring. */
+.graph-heading .graph-actions {flex:0 1 auto;align-items:center;gap:5px;max-width:100%}
+.graph-actions button {min-height:30px}.graph-actions button[aria-label] {min-width:32px}
+.material-current .block-inventory-icon {width:30px;height:30px;flex-basis:30px}
+.material-selection-dialog {width:min(820px,calc(100vw - 24px));padding:16px}
+.material-selection-dialog .material-picker {border:0;padding:0;margin:0;background:transparent}
+.material-selection-dialog .material-list {max-height:38dvh;grid-template-columns:repeat(auto-fill,minmax(210px,1fr))}
+.material-list button {display:flex;align-items:center;gap:9px;min-width:0}
+.material-list .block-inventory-icon {width:34px;height:34px;flex-basis:34px}
+.material-list button > span {min-width:0}.material-list strong,.material-list code {display:block;overflow-wrap:anywhere}
+.material-list strong {font-size:12px}.material-list code {font-size:10px;color:var(--muted)}
+.material-detail-identity {display:flex;align-items:center;gap:12px;min-width:0}
+.material-detail-identity > div {min-width:0;overflow-wrap:anywhere}
+.material-selection-dialog footer {position:sticky;bottom:0;background:var(--panel);padding:10px 0 0;margin-top:12px;justify-content:flex-end}
+.side.resizable-side {display:grid!important;gap:0;min-height:0;overflow:hidden}
+.resizable-side > section {min-height:0;height:auto!important;overflow:hidden;display:flex;flex-direction:column}
+.resizable-side > .split-y {height:8px;min-height:8px}
+.resizable-side > section > .panel-heading {flex:0 0 auto;min-height:36px;padding:5px 8px}
+.arrangement-panel .arrangement-editor {overflow:auto;min-height:0;flex:1;padding:8px;margin:0;border:0}
+.arrangement-panel .arrangement-grid {height:180px;min-height:120px;width:100%;display:block;touch-action:none}
+.arrangement-coordinates {border:0;padding:0!important;margin:0!important;display:flex;gap:7px;flex-wrap:wrap;min-width:0}
+.arrangement-coordinates label {flex:1;min-width:62px}.arrangement-coordinates input {width:100%;min-width:0}
+.arrangement-legend {padding:0;margin:6px 0;list-style:none;display:flex;flex-wrap:wrap;gap:5px 12px;font-size:11px}
+.arrangement-legend li {min-width:0;overflow-wrap:anywhere}.arrangement-legend li > span {display:inline-block;width:9px;height:9px;margin-right:4px}
+.arrangement-legend small {display:block;color:var(--muted);max-width:260px}
+@media(max-width:540px) {.graph-heading .graph-actions {width:100%;justify-content:flex-end}.graph-actions button {font-size:11px}.material-selection-dialog .material-list {grid-template-columns:1fr}.resizable-side > section > .panel-heading {font-size:12px}}
+
+.arrangement-panel .arrangement-editor.is-standalone {display:grid;grid-template-areas:"controls" "legend" "raster" "position" "actions";grid-template-rows:auto auto minmax(80px,1fr) auto auto;gap:4px;padding:6px}
+.is-standalone > .arrangement-tools:first-of-type {grid-area:controls;margin:0;gap:8px}
+.is-standalone > .hint {display:none}
+.is-standalone > .arrangement-legend {grid-area:legend;margin:0;gap:2px 10px}
+.is-standalone > .arrangement-grid {grid-area:raster;min-height:80px;height:100%}
+.is-standalone > .arrangement-zoom {grid-area:raster;align-self:end;justify-self:end;z-index:1;gap:3px;padding:3px;background:#18232cbb}
+.is-standalone > .arrangement-zoom button {min-height:25px;min-width:26px;padding:1px 5px}
+.is-standalone > .arrangement-position {grid-area:position;margin:0}
+.is-standalone > .arrangement-apply {grid-area:actions;margin:0;gap:5px}
+.is-standalone label {font-size:11px;margin:0;gap:2px}.is-standalone input,.is-standalone select {min-height:26px;padding:3px 5px;font-size:12px}
+.is-standalone .arrangement-apply button {min-height:26px;padding:3px 6px;font-size:11px}
+
 /* The node catalogue uses the same node presentation and operation signatures as the map. */
 .graph-heading .graph-identity {flex:1;min-width:0}
 .graph-heading > .button-row {margin-left:auto;width:auto;justify-content:flex-end}
@@ -539,3 +638,7 @@ button.danger:hover:not(:disabled),.file-list button.delete-armed {color:#fff;ba
 .area-drawing-tools label { display:grid; gap:4px; font-size:12px; }
 .area-drawing-tools select { min-width:0; width:100%; }
 .area-drawing-tools .hint { margin:6px 0 0; }
+
+.node-dialog .catalog-groups {flex:1;min-height:0;overflow:auto;padding-right:4px;scrollbar-gutter:stable}
+.node-dialog > .catalog-tools,.node-dialog > .catalog-filters,.node-dialog > .hint {flex:0 0 auto}
+.node-dialog > footer {position:static;flex:0 0 auto}

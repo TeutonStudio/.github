@@ -64,8 +64,8 @@ Vorschau: `http://127.0.0.1:4318/`. Sie bindet nur an Loopback.
 
 Transformationen benötigen Formgraphschema 4 bzw. Gebäudegraphschema 5; Vektorrechnung und der aneinanderliegende Säulenmodus benötigen Schema 5 bzw. 6.
 `sources.lock.json` pinnt den veröffentlichten Fachkerncommit
-[`a21a968`](https://github.com/TeutonStudio/Copycat-Architecture/commit/a21a9688418a6f0569235cd8df1fa4a56b97bab0)
-auf Basis 0.6.4, Branch `codex/graphstudio-reference-rotation`. Der neuere Mod-Hauptzweig
+[`e583178`](https://github.com/TeutonStudio/Copycat-Architecture/commit/e5831781f92985e65557f91be63c651d6955ce6c)
+auf Basis 0.6.4, Branch `codex/graphstudio-direct-area-authoring`. Der neuere Mod-Hauptzweig
 und vorhandene Release-JARs werden dadurch nicht ersetzt. Der öffentliche Build
 prüft weiterhin saubere, gepinnte Quellen und den Mindestvertrag in
 `adapters/copycat/core-contract.json`.
@@ -144,3 +144,40 @@ Rasterspalten an den Inspektor an. Reihenfolgeknöpfe stehen unter der Auswahl.
 Kacheln zeigen die Ebene und ihre Achsenbezeichnung; die aktive Kachel wird markiert.
 Pfeiltasten navigieren innerhalb des aktuellen Rasters, Home/End zur ersten/letzten
 Ebene. Auch die Spiegeloperation in einer Operatorfamilie verwendet diese Auswahl.
+
+## Direkte Flächen und Segmentanordnung
+
+Rückgängig, Wiederholen und Löschen stehen in der Kopfzeile des Graphen neben
+„+ Knoten“. Die Löschaktion berücksichtigt Knoten, Mehrfachauswahl und die
+gewählte Verbindung. Materialgruppen und die Gebäudepalette öffnen über
+„Wählen“ einen Dialog mit kleinen Blockvorschauen, Suche und Blockzuständen.
+„Dieses Material verwenden“ übernimmt die Auswahl; Abbrechen und Escape
+verwerfen sie. Die direkte Eingabe einer Material-ID bleibt möglich.
+
+Neue Segmente und Räume nehmen Flächen unmittelbar an. Tiefe beziehungsweise
+Raumhöhe und weitere Einstellungen stehen am Verbraucher im Inspektor.
+Neue Dächer verwalten dort bis zu 16 Dachflächen mit stabilen Kennungen,
+Geschossbindung, Dacheinstellungen und Gauben. Jede Dachfläche hat einen
+eigenen Flächenanschluss. Die bisherigen Knoten Segmentanordnung,
+Raumgrundriss, Dachebene und Dachanordnung werden bei neuen Knoten ausgeblendet;
+vorhandene Graphen mit diesen Knoten bleiben bearbeitbar.
+
+Bei Segmentoperatoren ergänzt eine eigene 2D-Anordnung die 3D-Vorschau und den
+Inspektor. Alle drei Bereiche lassen sich getrennt einklappen und in der Höhe
+verändern. Vereinigung, Schnitt, Differenz und symmetrische Differenz erlauben
+für jeden Eingang einen ganzzahligen X-/Y-/Z-Versatz in Blöcken, auch wenn
+dieselbe Quelle mehrfach angeschlossen ist. Front-, Drauf- und Seitenansicht
+zeigen den gemeinsamen Ursprung. Ziehen, Pfeiltasten und Zahlenfelder ändern
+die Anordnung zunächst als Entwurf mit unmittelbarer 3D-Vorschau.
+„Anordnung übernehmen“ erzeugt einen gemeinsamen Undo-Schritt; „Verwerfen“
+verwirft den Entwurf. Unäre Segmenttransformationen zeigen Quelle und Ergebnis
+zum Vergleichen. Die vorhandene Musteranordnung nutzt denselben Bereich.
+
+Die neuen direkten Verbindungen, eingebetteten Dachflächen und relativen
+Segmentversätze verwenden Gebäudegraphschema 11. Bestehende DTO-Felder und die
+Auswertung älterer Graphen bleiben erhalten. Der Browser verwendet dafür den
+kanonischen Kotlin-Fachkern. Der öffentliche Build pinnt dafür den geprüften
+Quellstand in `sources.lock.json`; ältere gespeicherte Graphen bleiben nutzbar.
+
+Die [Abnahme vom 20. November 2026](reports/graphstudio-authoring-2026-11-20.md)
+enthält Prüfbefehle, Ergebnisse und Ansichten.
