@@ -37,7 +37,7 @@ export async function saveWorkspace(data, expectedRevision) {
       : 'Speichern fehlgeschlagen. Bitte eine Sicherung exportieren; der letzte gespeicherte Stand bleibt erhalten.'))
   })
 }
-export const emptyWorkspace = () => ({ schema: 1, drafts: {}, graphs: [], nodeGroups: [], mods: [] })
+export const emptyWorkspace = () => ({ schema: 1, drafts: {}, graphs: [], nodeGroups: [], mods: [], documentNames: {} })
 export function validateWorkspace(value) {
   if (!value || value.schema !== 1 || !value.drafts || typeof value.drafts !== 'object' || Array.isArray(value.drafts) ||
     !['graphs', 'nodeGroups', 'mods'].every(key => Array.isArray(value[key]))) throw new Error('Keine gültige Graphstudio-Sicherung (Schema 1).')
@@ -51,6 +51,8 @@ export function validateWorkspace(value) {
   for (const mod of value.mods) for (const values of [mod.blocks, mod.models, mod.textures]) for (const url of Object.values(values)) {
     if (typeof url !== 'string' || !url.startsWith(`https://raw.githubusercontent.com/${mod.repo}/${mod.commit}/`)) throw new Error('Die Sicherung enthält ungültige Ressourcen-Adressen.')
   }
+  if (value.documentNames !== undefined && (!value.documentNames || typeof value.documentNames !== 'object' || Array.isArray(value.documentNames)
+    || Object.values(value.documentNames).some(name => typeof name !== 'string' || !name.trim() || name.length > 64 || /[\x00-\x1f]/.test(name)))) throw new Error('Ungültige gemeinsame Graphnamen in der Sicherung.')
   return value
 }
 

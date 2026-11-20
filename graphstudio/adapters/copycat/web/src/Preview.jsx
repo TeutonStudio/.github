@@ -145,7 +145,7 @@ function groundCompass(group, bounds) {
     new THREE.Vector3(center.x + diameter * 0.55, plane.position.y, center.z + diameter * 0.55))
 }
 
-export function Viewer({ plan, blockFrame, catalog, details }) {
+export function Viewer({ plan, blockFrame, catalog, details, fitKey }) {
   const container = useRef(null)
   const viewer = useRef(null)
   const [activeSide, setActiveSide] = useState('')
@@ -360,10 +360,10 @@ export function Viewer({ plan, blockFrame, catalog, details }) {
     view.bounds = blockFrame && singleBlock ? referenceFrame(view.guides) : bounds
     dispose(view.ground); view.ground.clear(); view.ground.userData.bounds = null
     groundCompass(view.ground, view.bounds)
-    if (!view.fitted) fit()
+    if (!view.fitted || view.fitKey!==fitKey) { fit();view.fitKey=fitKey }
     view.render()
     return () => { live = false }
-  }, [plan, blockFrame, catalog])
+  }, [plan, blockFrame, catalog,fitKey])
 
   const hasDetails = !!details
   return <div className={`viewer-with-sides${hasDetails ? ' has-details' : ''}`}>
@@ -416,7 +416,7 @@ export default function Preview({ mode, document, library, selected, previewMode
       running.current = false
       if (data.id === sequence.current) {
         onDiagnostics?.(data.diagnostics || [])
-        setResult(previous => data.error ? { plan: previous.plan, error: data.error, pending: false } : data)
+        setResult(previous => data.error ? { ...previous, error: data.error, pending: false } : data)
       }
       send()
     }
@@ -436,7 +436,7 @@ export default function Preview({ mode, document, library, selected, previewMode
     }
     const timer = setTimeout(() => {
       setResult(previous => ({ ...previous, pending: true, error: '' }))
-      queued.current = { id, mode, document: latest.current, library, selected: target, materials }
+      queued.current = { id, mode, document: latest.current, library, selected: target, materials,viewKey:`${mode}:${document.id || document.graph.nodes.find(node=>node.resultType)?.id || document.name || "graph"}:${target}` }
       send()
     }, 130)
     return () => clearTimeout(timer)
@@ -455,7 +455,7 @@ export default function Preview({ mode, document, library, selected, previewMode
       <button type="button" aria-expanded={!collapsed} aria-controls={`${mode}-preview`} aria-label={collapsed ? '3D-Vorschau ausklappen' : '3D-Vorschau einklappen'} onClick={onToggle}>{collapsed ? '▸' : '▾'}</button>
     </div></div>
     <div id={`${mode}-preview`} className="preview-body" hidden={collapsed}>
-    <Viewer plan={texturedPlan} blockFrame={blockFrame} catalog={catalog} details={<>
+    <Viewer plan={texturedPlan} fitKey={result.viewKey} blockFrame={blockFrame} catalog={catalog} details={<>
     <div className="preview-meta" role="status">
       {result.error ? <><strong>{result.plan ? 'Letzter gültiger Stand' : 'Vorschau wartet auf einen gültigen Graphen'}</strong><br />{result.error}</>
         : result.pending ? 'Vorschau wird berechnet …'

@@ -113,3 +113,41 @@ Flächen: Quadrat, Rechteck oder direkt im 2D-Raster zeichnen. Dynamische
 Segmentachsen werden erst am Raum/Dach aufgelöst. Neue Dachknoten bieten fünf
 Vorlagenanschlüsse und ermitteln deren Anwendungsstellen automatisch.
 Flächen/Dynamik benötigen Gebäudegraphschema 7, gemeinsame Karten Schema 8.
+
+## Direkte Flächen und Segmentanordnung
+
+Rückgängig, Wiederholen und Löschen stehen in der Kopfzeile des Graphen neben
+„+ Knoten“. Die Löschaktion berücksichtigt Knoten, Mehrfachauswahl und die
+gewählte Verbindung. Materialgruppen und die Gebäudepalette öffnen über
+„Wählen“ einen Dialog mit kleinen Blockvorschauen, Suche und Blockzuständen.
+„Dieses Material verwenden“ übernimmt die Auswahl; Abbrechen und Escape
+verwerfen sie. Die direkte Eingabe einer Material-ID bleibt möglich.
+
+Neue Segmente und Räume nehmen Flächen unmittelbar an. Tiefe beziehungsweise
+Raumhöhe und weitere Einstellungen stehen am Verbraucher im Inspektor.
+Neue Dächer verwalten dort bis zu 16 Dachflächen mit stabilen Kennungen,
+Geschossbindung, Dacheinstellungen und Gauben. Jede Dachfläche hat einen
+eigenen Flächenanschluss. Die bisherigen Knoten Segmentanordnung,
+Raumgrundriss, Dachebene und Dachanordnung werden bei neuen Knoten ausgeblendet;
+vorhandene Graphen mit diesen Knoten bleiben bearbeitbar.
+
+Bei Segmentoperatoren ergänzt eine eigene 2D-Anordnung die 3D-Vorschau und den
+Inspektor. Alle drei Bereiche lassen sich getrennt einklappen und in der Höhe
+verändern. Vereinigung, Schnitt, Differenz und symmetrische Differenz erlauben
+für jeden Eingang einen ganzzahligen X-/Y-/Z-Versatz in Blöcken, auch wenn
+dieselbe Quelle mehrfach angeschlossen ist. Front-, Drauf- und Seitenansicht
+zeigen den gemeinsamen Ursprung. Ziehen, Pfeiltasten und Zahlenfelder ändern
+die Anordnung zunächst als Entwurf mit unmittelbarer 3D-Vorschau.
+„Anordnung übernehmen“ erzeugt einen gemeinsamen Undo-Schritt; „Verwerfen“
+verwirft den Entwurf. Unäre Segmenttransformationen zeigen Quelle und Ergebnis
+zum Vergleichen. Die vorhandene Musteranordnung nutzt denselben Bereich.
+
+Die neuen direkten Verbindungen, eingebetteten Dachflächen und relativen
+Segmentversätze verwenden Gebäudegraphschema 11. Bestehende DTO-Felder und die
+Auswertung älterer Graphen bleiben erhalten. Der Browser verwendet dafür den
+kanonischen Kotlin-Fachkern. Diese Funktionen stehen im lokalen Alpha-Build
+mit dem passenden Entwicklungskern bereit; `sources.lock.json` bleibt beim
+bisherigen öffentlichen Stand.
+
+Die [Abnahme vom 20. November 2026](reports/graphstudio-authoring-2026-11-20.md)
+enthält Prüfbefehle, Ergebnisse und Ansichten.
