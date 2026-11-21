@@ -64,8 +64,8 @@ Vorschau: `http://127.0.0.1:4318/`. Sie bindet nur an Loopback.
 
 Transformationen benötigen Formgraphschema 4 bzw. Gebäudegraphschema 5; Vektorrechnung und der aneinanderliegende Säulenmodus benötigen Schema 5 bzw. 6.
 `sources.lock.json` pinnt den veröffentlichten Fachkerncommit
-[`e583178`](https://github.com/TeutonStudio/Copycat-Architecture/commit/e5831781f92985e65557f91be63c651d6955ce6c)
-auf Basis 0.6.4, Branch `codex/graphstudio-direct-area-authoring`. Der neuere Mod-Hauptzweig
+[`640c3eb`](https://github.com/TeutonStudio/Copycat-Architecture/commit/640c3ebfb6adf5b515e49f814cd5ff3e2a110fc6)
+auf Basis 0.6.4, Branch `codex/room-area-schema-fix`. Der neuere Mod-Hauptzweig
 und vorhandene Release-JARs werden dadurch nicht ersetzt. Der öffentliche Build
 prüft weiterhin saubere, gepinnte Quellen und den Mindestvertrag in
 `adapters/copycat/core-contract.json`.
