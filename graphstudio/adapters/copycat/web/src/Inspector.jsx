@@ -1,4 +1,5 @@
 import { cardTypeLabel } from './card-types.js'
+import {axisLabel,regionLabel} from './axis-labels.js'
 import { IntegerField } from './IntegerField.jsx'
 import { MirrorPlanePicker } from './MirrorPlanePicker.jsx'
 import { useState } from 'react'
@@ -9,7 +10,7 @@ import { formGroups, model } from './model.js'
 import { MaterialField } from './Workspace.jsx'
 import { copycatShapeNames } from './copycat-options.js'
 
-export const names = { REFERENCE:'Referenz',VECTOR_SPLIT:'Position zerlegen',
+export const names = { BOOLEAN:'Booleanwert',INT_COMPARE:'Zahlenvergleich',BOOLEAN_LOGIC:'Booleanoperator',CONDITIONAL:'Bedingte Abbildung',ROOF_TEMPLATE:'Dachvorlage',SERVICE_SHAFT_SEGMENT:'Schachtsegment',ELEVATOR_SHAFT_SEGMENT:'Aufzugssegment', REFERENCE:'Referenz',VECTOR_SPLIT:'Position zerlegen',
   INT_ADD: 'Anzahl addieren',
   INT_SUBTRACT: 'Anzahl subtrahieren',
   INT_MULTIPLY: 'Anzahl multiplizieren',
@@ -26,7 +27,8 @@ export const names = { REFERENCE:'Referenz',VECTOR_SPLIT:'Position zerlegen',
   POSITION_Y: 'Position zerlegen · Y',
   POSITION_Z: 'Position zerlegen · Z',
 
-  POSITION:'Position (hB)', TRANSLATE:'Copycat positionieren', COPYCAT_POSITION:'Copycat positionieren', INT: 'Anzahl', ROTATION_SEGMENT: 'Rotationssegment', AREA: 'Fläche', SEGMENT_LAYOUT: 'Segmentanordnung', ROOM_GEOMETRY: 'Raumgrundriss', ROOF_LEVEL: 'Dachebene', ROOF_LAYOUT: 'Dachanordnung', STAIRWELL: 'Treppenhaus', ELEVATOR_SHAFT: 'Aufzugsschacht', SERVICE_SHAFT: 'Installationsschacht', GARDEN: 'Garten', PATH: 'Weg', ROOM_LAYOUT: 'Raumanordnung', BAY_WINDOW: 'Erker', DORMER: 'Gaube',
+  TRANSFORMATION:'Transformation', COPYCAT_TRANSFORM:'Copycat transformieren', SEGMENT_TRANSFORM:'Segment transformieren',
+  POSITION:'Position (hB)', TRANSLATE:'Copycat positionieren', COPYCAT_POSITION:'Copycat positionieren', INT: 'Ganzzahl', COUNT:'Anzahl',INT_ABS:'Betrag |x|',INT_TO_COUNT:'Als Anzahl',INT_REMAINDER:'Divisionsrest', ROTATION_SEGMENT: 'Rotationssegment', AREA: 'Fläche', SEGMENT_LAYOUT: 'Segmentanordnung', ROOM_GEOMETRY: 'Raumgrundriss', ROOF_LEVEL: 'Dachebene', ROOF_LAYOUT: 'Dachanordnung', STAIRWELL: 'Treppenhaus', ELEVATOR_SHAFT: 'Aufzugsschacht', SERVICE_SHAFT: 'Installationsschacht', GARDEN: 'Garten', PATH: 'Weg', ROOM_LAYOUT: 'Raumanordnung', BAY_WINDOW: 'Erker', DORMER: 'Gaube',
   INPUT: 'Grundform', UNION: 'Vereinigung', INTERSECTION: 'Schnitt', DIFFERENCE: 'Differenz',
   SYMMETRIC_DIFFERENCE: 'Symmetrische Differenz', ROTATE: 'Copycat rotieren', ROTATION: 'Rotation', OUTPUT: 'Ergebnis',
   SAVED: 'Gespeicherter Copycat', MIRROR: 'Copycat spiegeln',
@@ -39,17 +41,27 @@ export const names = { REFERENCE:'Referenz',VECTOR_SPLIT:'Position zerlegen',
 }
 
 export function portName(port, node) {
+  if(node.kind==='CONDITIONAL')return ['Wert A · wahr','Boolean','Wert B · falsch'][Number(port.id.replace('in:',''))]
+  if(node.kind==='BOOLEAN_LOGIC')return `Boolean ${Number(port.id.replace('in:',''))+1}`
+  if(port.id==='roofTemplate')return 'Dachvorlage'
+  if(port.id==='geometry' && node.kind==='ROOF')return 'Fläche'
+  if((node.kind==='ROOF_TEMPLATE'||node.kind==='ROOF'&&node.roofInputMode==='SEGMENTS')&&port.id.startsWith('in:'))return ['Dachschräge gerade','Innenecke','Außenecke','First gerade','Firstkurve 90°','First T','First X','Einzelne Spitze'][Number(port.id.slice(3))]
   const native = { length: 'Länge (Y)', roofPeak: 'Dachspitze (optional)', roofEave: 'Dachendkante / Traufe (optional)', layout: 'Anordnung', geometry: 'Grundriss', area: 'Fläche', tread: 'Stufen', landing: 'Podest', enclosure: 'Schachtwände' }
   if(node.kind==='AREA' && ['length','height'].includes(port.id)) return `${node.areaMode==='SQUARE'?'Seitenlänge':port.id==='length'?'Breite X':'Länge Z'} · Anzahl`
+  if(port.id.startsWith('area:')) return `Fläche · ${node.roofSections?.find(section=>section.id===port.id.slice(5))?.name || 'Dachfläche'}`
+  if(port.id.startsWith('sectionDormer:')) return 'Gaube · Dachfläche'
+  if(port.id==='layout' && node.kind==='SEGMENT' || port.id==='geometry' && node.kind==='ROOM') return 'Fläche / bisherige Geometrie'
   if (native[port.id]) return native[port.id]
-  if (port.id.startsWith('region:')) return `Bereich ${port.id.slice(7)}`
+  if (port.id.startsWith('region:')) return regionLabel(port.id)
   if (port.id.startsWith('semantic:')) {
     const words = { bay: 'Erker', dormer: 'Gaube', wall: 'Wand', front: 'Front', floor: 'Boden', ceiling: 'Decke', roof: 'Dach', source: 'Quelle', opening: 'Öffnung', column: 'Säule', mask: 'Maske', inset: 'Einsatz' }
     return port.id.slice(9).split(':').map(word => words[word] || word).join(' · ')
   }
   if (port.id.startsWith('edge:')) return `Wandkante ${port.id.slice(5)}`
-  if(node.kind==='POSITION' && /^\d$|^in:[0-2]$/.test(port.id)) return ['X','Y','Z'][Number(port.id.replace('in:',''))] + ' · Anzahl'
+  if(node.kind==='POSITION' && /^\d$|^in:[0-2]$/.test(port.id)) return axisLabel(['X','Y','Z'][Number(port.id.replace('in:',''))]) + ' · Ganzzahl'
   if(/^POSITION_[XYZ]$/.test(node.kind)) return 'Position · Vektor3'
+  if(node.kind==='TRANSFORMATION') return {0:'Spiegelung',1:'Rotation',2:'Position (hB)',mirroring:'Spiegelung',rotation:'Rotation',positionValue:'Position (hB)'}[port.id] || port.id
+  if(port.id==='transformationValue' || node.kind==='COPYCAT_TRANSFORM' && port.id==='1') return 'Transformation'
   if (port.id === 'positionValue') return 'Position (hB)'
   if (['MIRROR','TRANSLATE'].includes(node.kind) && port.id === '1') return node.kind === 'MIRROR' ? 'Spiegelung' : 'Position (hB)'
   if (port.id === 'rotation') return 'Rotationen'
@@ -58,7 +70,7 @@ export function portName(port, node) {
   if (node.kind === 'SEGMENT_DIFFERENCE' && kind === 'in') return key === '0' ? 'A · Grundsegment' : 'B · Abzug'
   if (node.kind === 'COPYCAT_DIFFERENCE' && kind === 'in') return key === '0' ? 'A · Grundform' : 'B · Abzug'
   if(kind==='in' && node.kind.startsWith('POSITION_') && !/^POSITION_[XYZ]$/.test(node.kind)) return `Position ${Number(key)+1}`
-  if(kind==='in' && node.kind.startsWith('INT_')) return `Anzahl ${Number(key)+1}`
+  if(kind==='in' && node.kind.startsWith('INT_')) return `Ganzzahl / Anzahl ${Number(key)+1}`
   if(kind==='in' && node.resultType) return `Ergebnis · ${cardTypeLabel(node.resultType)}`
   if (kind === 'in') {
     if(node.kind==='SEGMENT' && node.dynamicAxes?.length) return 'Inneres · Copycat'
@@ -106,7 +118,7 @@ export function Field({ label, value, onChange, options, type = 'text', min, max
 }
 
 const angles = [[0, '0°'], [1, '90°'], [2, '180°'], [3, '270°']]
-const axes = [['X', 'X · Ost/West'], ['Y', 'Y · Höhe'], ['Z', 'Z · Süd/Nord'], ['NORMAL', 'Lokale Normale']]
+const axes = [...['X','Y','Z'].map(axis=>[axis,axisLabel(axis)]),['NORMAL','Lokale Normale']]
 const groupOptions = (groups, empty) => [['', empty], ...groups.map(group => [group.id, group.name])]
 const materialModes = [['SEPARATED', 'Separiert'], ['GROUPED', 'Gruppiert']]
 const viewFilters = [['all', 'Alles'], ['walls', 'Wände'], ['floor', 'Boden'], ['ceiling', 'Decke'], ['roof', 'Dach']]
@@ -158,18 +170,16 @@ export function NodeFields({ mode, node, document, edit, library, onChooseCopyca
             inputGroups: node.inputs.map((_, i) => i === index ? group : node.inputGroups[i] ?? '')
           })} />)}
       {node.kind === 'OUTPUT' && field('previewGroup', 'Vorschaugruppe', groupOptions(groups, 'Alle'))}
-      {node.kind === 'DIFFERENCE' && <button type="button" onClick={() => edit({ inputs: [...node.inputs].reverse() })}>A / B tauschen</button>}
     </>
   }
 
-  if(node.resultType) return <label>Ausgabetyp der Karte<select aria-label="Ausgabetyp der Karte" value={node.resultType} onChange={e=>edit({resultType:e.target.value,inputs:['']})}>{model.cardTypes.map(type=><option key={type} value={type}>{cardTypeLabel(type)}</option>)}</select></label>
+  if(node.resultType) return null
   if (node.id === 'empty_wall') return <p className="hint">Standardquelle für eine freie Wandöffnung.</p>
   return <>
     {field('name', 'Knotenname')}
     {node.kind === 'COPYCAT' && <><div className="copycat-source-row">{copycatPicker}{node.inlinePart && (model.shapes.find(s=>s.id===node.inlinePart.source)?.max || 1)>1 && <IntegerField className="copycat-size" label="Größe" value={node.inlinePart.size || 1} min={1} max={model.shapes.find(s=>s.id===node.inlinePart.source).max} onChange={size=>edit({inlinePart:{...node.inlinePart,size}})}/>}</div><button type="button" onClick={onImportCopycat}>Formdatei laden</button></>}
     <NativeFields {...{ mode, node, edit, document, library, onInspectNode }} />
     {['ROOM', 'STOREY', 'BUILDING'].includes(node.kind) && field('preview', 'Vorschaufilter', viewFilters)}
-    {['COPYCAT_DIFFERENCE', 'SEGMENT_DIFFERENCE'].includes(node.kind) && <button type="button" onClick={() => edit({ inputs: [...node.inputs].reverse() })}>A / B tauschen</button>}
   </>
 }
 

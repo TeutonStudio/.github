@@ -1,7 +1,8 @@
 import { DeleteDialog } from './FileDialog.jsx'
 import { groupVersions } from './version-groups.js'
-import { dependencies, deleteVersion, mergeVersions } from './documents.js'
+import { dependencies, deleteVersion, mergeVersions, namedWorkspace } from './documents.js'
 import { Modal } from './Modal.jsx'
+import { BlockIcon } from './BlockIcon.jsx'
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { createMaterials, FAITHFUL, importRepository, materialValue, parseMaterial, stateOptions, defaultProperties } from './materials.js'
 import { migrateWorkspace, emptyWorkspace, resourceCache, saveWorkspace, stored, validateWorkspace } from './storage.js'
@@ -40,9 +41,10 @@ export function Workspace({ children }) {
     writeQueue.current.then(() => { if (current === revision.current) { setSaved(true); setError('') } }).catch(error => setError(error.message))
   }, [data, canSave])
   const catalog = useMemo(() => createMaterials(data?.mods, resourceCache), [data?.mods])
+  const namedData = useMemo(() => data && namedWorkspace(data), [data])
   const update = callback => {const next=callback(currentData.current);currentData.current=next;setData(next);return next}
   if (!data) return <p className="workspace-status">Gespeicherte Bibliotheken werden geladen …</p>
-  return <Context.Provider value={{ data, update, catalog, openPanel: target => { setTab(target); setPanel(true) } }}>
+  return <Context.Provider value={{ data:namedData, update, catalog, openPanel: target => { setTab(target); setPanel(true) } }}>
     <div inert={panel ? true : undefined}>{children}
     <div className="workspace-status" role="status">{error || (saved ? 'Im Browser gespeichert' : 'Wird im Browser gespeichert …')}
       {error && <button onClick={() => downloadBackup(data)}>Sicherung exportieren</button>}</div>
@@ -52,46 +54,54 @@ export function Workspace({ children }) {
 }
 
 export function MaterialField({ label, value, onChange, blockOnly = false }) {
-  const { catalog } = useWorkspace()
-  const [open, setOpen] = useState(false), [preview, setPreview] = useState(null)
-  useEffect(() => { let live = true; setPreview(null); if (value) catalog.resolve(value).then(data => { if (live) setPreview(data) }).catch(() => {}); return () => { live = false } }, [catalog, value])
+  const [open, setOpen] = useState(false)
   return <div className="material-field"><label>{label}<div className="material-current">
-    {preview?.faces.find(Boolean) && <img src={preview.faces.find(Boolean)} alt="" loading="lazy" />}
-    <input value={value || ''} onChange={event => onChange(event.target.value)} />
-    <button type="button" aria-label={`Material für ${label} wählen`} onClick={() => setOpen(!open)}>Wählen</button>
-  </div></label>{open && <>{blockOnly && <p className="hint">Die Gebäudepalette übernimmt die Block-ID. Zustände dienen hier zum Nachschlagen; Copycat-Gruppen können sie für die Browservorschau speichern.</p>}<MaterialPicker value={value} onChoose={value => { onChange(blockOnly ? parseMaterial(value).block : value); setOpen(false) }} /></>}</div>
+    {value && <BlockIcon id={value} />}<input aria-label={label} value={value || ''} onChange={event => onChange(event.target.value)} />
+    <button type="button" aria-label={`Material für ${label} wählen`} onClick={() => setOpen(true)}>Wählen</button>
+  </div></label>{open && <Modal className="material-selection-dialog" title={`Material wählen · ${label}`} onClose={() => setOpen(false)}>
+    {blockOnly && <p className="hint">Die Palette übernimmt die Block-ID. Blockzustände dienen hier zur Vorschau.</p>}
+    <MaterialPicker value={value} onChoose={next => { onChange(blockOnly ? parseMaterial(next).block : next); setOpen(false) }} onCancel={() => setOpen(false)} />
+  </Modal>}</div>
 }
-function MaterialPicker({ value, onChoose }) {
+function MaterialPicker({ value, onChoose, onCancel }) {
   const { catalog } = useWorkspace()
   const [query, setQuery] = useState(''), [limit, setLimit] = useState(60), [chosen, setChosen] = useState(null)
-  const [properties, setProperties] = useState({}), [options, setOptions] = useState({}), [preview, setPreview] = useState(null), [error, setError] = useState('')
+  const [properties, setProperties] = useState({}), [options, setOptions] = useState({}), [preview, setPreview] = useState(null), [error, setError] = useState(''), [loading,setLoading] = useState(false), [stateReady,setStateReady] = useState(false)
   const generation = useRef(0)
   const ids = catalog.ids.filter(id => id.includes(query.toLowerCase().trim()))
-  const choose = async id => {
-    const request = ++generation.current; setChosen(id); setError(''); setPreview(null); setProperties({}); setOptions({})
-    try { const state = await catalog.state(id); if (generation.current !== request) return
-      setOptions(stateOptions(state)); setProperties(defaultProperties(state))
-    } catch (error) { if (generation.current === request) setError(error.message) }
+  const choose = async (id, requested) => {
+    const request = ++generation.current
+    setChosen(id); setError(''); setPreview(null); setProperties({}); setOptions({}); setLoading(true);setStateReady(false)
+    try {
+      const state = await catalog.state(id)
+      if (generation.current !== request) return
+      setOptions(stateOptions(state)); setProperties({ ...defaultProperties(state), ...requested });setStateReady(true)
+    } catch (cause) { if (generation.current === request) { setError(cause.message); setLoading(false) } }
   }
   useEffect(() => {
-    if (!chosen) return
-    let live = true; setError('')
-    catalog.resolve(materialValue(chosen, properties)).then(data => { if (live) setPreview(data) }).catch(error => { if (live) setError(error.message) })
+    if(value) { try { const {block,properties}=parseMaterial(value); choose(block,properties); const index=catalog.ids.indexOf(block); if(index>=60) setQuery(block) } catch(cause) { setError(cause.message) } }
+    return () => { generation.current++ }
+  }, [catalog])
+  useEffect(() => {
+    if (!chosen || !stateReady || !Object.keys(options).every(key => Object.hasOwn(properties,key))) return
+    let live = true; setError('');setPreview(null);setLoading(true)
+    catalog.resolve(materialValue(chosen, properties)).then(data => { if (live) { setPreview(data);setLoading(false) } }).catch(cause => { if (live) { setError(cause.message);setLoading(false) } })
     return () => { live = false }
-  }, [catalog, chosen, properties])
+  }, [catalog, chosen, properties, options,stateReady])
   return <div className="material-picker">
-    <label>Blöcke suchen<input type="search" placeholder="minecraft:stone oder modid:block" value={query} onChange={event => { setQuery(event.target.value); setLimit(60) }} /></label>
+    <label>Blöcke suchen<input data-autofocus type="search" placeholder="minecraft:stone oder modid:block" value={query} onChange={event => { setQuery(event.target.value); setLimit(60) }} /></label>
     <small>{ids.length} Blöcke · {value || 'Noch kein Material gewählt'}</small>
-    <div className="material-list">{ids.slice(0, limit).map(id => <button key={id} type="button" className={chosen === id ? 'chosen' : ''} onClick={() => choose(id)}>{id}</button>)}</div>
+    <div className="material-list">{ids.slice(0, limit).map(id => <button key={id} type="button" aria-pressed={chosen===id} className={chosen === id ? 'chosen' : ''} onClick={() => choose(id)}><BlockIcon id={id}/><span><strong>{id.split(':').at(-1).replaceAll('_',' ')}</strong><code>{id}</code></span></button>)}</div>
+    {!ids.length && <p role="status">Keine passenden Blöcke.</p>}
     {ids.length > limit && <button type="button" onClick={() => setLimit(limit + 100)}>Weitere Blöcke</button>}
-    {chosen && <div className="material-detail"><strong>{chosen}</strong><small>{catalog.owner(chosen)}</small>
-      {Object.entries(options).map(([key, values]) => <label key={key}>{key}<select value={properties[key] || ''} onChange={event => setProperties({ ...properties, [key]: event.target.value })}>{values.map(value => <option key={value}>{value}</option>)}</select></label>)}
-      {preview?.faces.find(Boolean) && <img className="material-sample" src={preview.faces.find(Boolean)} alt={`Textur von ${chosen}`} />}
+    {chosen && <div className="material-detail"><div className="material-detail-identity"><BlockIcon id={materialValue(chosen,properties)}/><div><strong>{chosen}</strong><small>{catalog.owner(chosen)}</small></div></div>
+      {Object.entries(options).map(([key, values]) => <label key={key}>{key}<select aria-label={`Blockzustand ${key}`} value={properties[key] || ''} onChange={event => setProperties({ ...properties, [key]: event.target.value })}>{values.map(option => <option key={option}>{option}</option>)}</select></label>)}
+      {loading && <p role="status">Blockvorschau wird geladen …</p>}
       {preview?.missing.length > 0 && <p className="error">Fehlende Texturen: {preview.missing.join(', ')}</p>}
       {preview?.warning && <p>{preview.warning}</p>}
-      {error && <p className="error" role="status">{error}</p>}
-      {onChoose && <button className="primary" type="button" disabled={!preview || Boolean(error)} onClick={() => onChoose(materialValue(chosen, properties))}>Dieses Material verwenden</button>}
     </div>}
+    {error && <p className="error" role="alert">{error}</p>}
+    {onChoose && <footer><button type="button" onClick={onCancel}>Abbrechen</button><button className="primary" type="button" disabled={loading || !preview || Boolean(error)} onClick={() => onChoose(materialValue(chosen, properties))}>Dieses Material verwenden</button></footer>}
   </div>
 }
 function LibraryPanel({ tab, setTab, onClose }) {
@@ -117,6 +127,7 @@ function LibraryPanel({ tab, setTab, onClose }) {
       const recovered = [...new Map(Object.values(restored.drafts).map(entry => [JSON.stringify(entry),entry])).values()].map(entry => ({ ...entry, id: crypto.randomUUID(), name: `Wiederhergestellt · ${entry.document.name || entry.mode}` }))
       const graphs=mergeVersions(data.graphs,[...restored.graphs,...recovered]), nodeGroups=mergeVersions(data.nodeGroups,restored.nodeGroups)
       update(data => ({ ...data, graphs, nodeGroups,
+        documentNames: {...restored.documentNames, ...data.documentNames},
         mods: [...new Map([...data.mods, ...restored.mods].map(item => [item.repo, item])).values()] }))
       setError('Sicherung zusammengeführt. Benannte Graphen können im Editor geöffnet werden.')
     } catch (error) { setError(error.message) }

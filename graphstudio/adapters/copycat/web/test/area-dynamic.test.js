@@ -57,6 +57,6 @@ test('adaptive roof exposes arrangement and all five typed segment slots from th
  const doc=base();doc.graph.schema=7;doc.graph.nodes.push(newNode(true,'ROOF','automatic',0,0,true))
  const ports=describeNode(true,doc,'automatic').ports
  assert.deepEqual(ports.map(p=>p.id),['layout','in:0','in:1','in:2','in:3','in:4'])
- assert.ok(ports.slice(1).every(p=>p.types.every(type=>type==='WALL')))
+ assert.ok(ports.slice(1).every(p=>p.types.every(type=>['WALL','ROOF'].includes(type))))
  assert.equal(doc.graph.nodes.find(n=>n.id==='roof').adaptiveRoof,undefined)
 })

@@ -6,3 +6,6 @@ graphstudio/adapters/copycat/web/dist/
 graphstudio/adapters/copycat/web/src/generated/
 graphstudio/adapters/copycat/web/.tools/
 graphstudio/adapters/copycat/web/public/compatibility.json
+graphstudio/.alpha-dist/
+graphstudio/alpha/node_modules
+graphstudio/alpha/dist/

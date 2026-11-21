@@ -1,5 +1,5 @@
 {
-  "formSchema": 5,
-  "buildingSchema": 8,
+  "formSchema": 9,
+  "buildingSchema": 13,
   "channel": "public-pinned"
 }

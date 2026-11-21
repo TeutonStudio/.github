@@ -1,0 +1,53 @@
+{
+  "schema": 1,
+  "date": "2026-11-20",
+  "version": "0.2.0-alpha.1",
+  "status": "local-alpha-verified",
+  "preview": "http://127.0.0.1:4319/",
+  "alphaSourceSha256": "15ba80075ce718885ed9d997b468a02091449702016296ac028784d9fdff853b",
+  "ccvisualSourceSha256": "2fa4132ac06832a297a16ad934149930e89588cb6abc5a723188b043fee52b52",
+  "copycatAdapterSha256": "3bf63cfcc329485993f1d2f3fbf6f7f5a1caadf7a8f9bc4541f23e8e636495ae",
+  "packLockSha256": "bf9abafbc3a3571d3d1eedfe6bcbcb66bf2af6ab359a7ce792369ffee119e08f",
+  "checks": {
+    "organizationTests": {
+      "command": "npm test",
+      "passed": 9,
+      "failed": 0
+    },
+    "alphaTests": {
+      "command": "npm run test:alpha",
+      "passed": 10,
+      "failed": 0,
+      "overlapWithOrganizationTests": 6
+    },
+    "cobaltExecutionCases": [
+      "Independent state in two instances",
+      "Nested extracted state group",
+      "Tuple arity including nil holes",
+      "One peripheral invocation reused by two consumers"
+    ],
+    "build": "passed: native CCVisual core, Alpha browser and Copycat overlay",
+    "packageLock": "npm ci --offline --ignore-scripts --dry-run passed in an empty temporary directory",
+    "browser": [
+      "Common home and 90-node catalog",
+      "Restored projects after reload",
+      "Function and state group navigation",
+      "Raw Lua edit, syntax error and repair",
+      "Cable disconnection and undo",
+      "Copycat graph and 3D preview inside the common workspace",
+      "Pack search finds Mekanism and indirect Generators integration",
+      "Export options enabled for a valid native result"
+    ]
+  },
+  "screenshots": [
+    "images/graphstudio-alpha-home-2026-11-20.jpg",
+    "images/graphstudio-alpha-lua-2026-11-20.jpg"
+  ],
+  "limits": [
+    "Loopback JVM bridge required for compilation and Lua export",
+    "12 selected typed API methods; 39 pack containers inventoried",
+    "Browser download event was not observed by automation; downloaded file persistence was not verified",
+    "No Minecraft or multiplayer execution certification",
+    "No publication or migration of the existing Copycat deployment"
+  ]
+}

@@ -1,4 +1,4 @@
-import { duplicateGraph, applyGraphDiagram, replaceGraphNodes, exportDocument, editInspectorNode, normalizeDocument, wireModels, compileForm, graphModels, inspectGraph, prepareForm } from './generated/engine.mjs'
+import { promoteNumberGraph, editGraphInputs, duplicateGraph, applyGraphDiagram, replaceGraphNodes, exportDocument, editInspectorNode, normalizeDocument, wireModels, compileForm, graphModels, inspectGraph, prepareForm } from './generated/engine.mjs'
 
 export const model = { ...graphModels(), mirrorPlanes: wireModels().enums.CopycatMirrorPlane }
 export const defaults = [{ id: 'body', name: 'Body', role: 'surface', priority: 0 }]
@@ -109,3 +109,10 @@ export function duplicateSelection(mode, document, ids, copies) {
   const candidate={...document,graph:{...document.graph,nodes:[...document.graph.nodes,...copied],nodeGroups:[...(document.graph.nodeGroups || []),...copiedGroups]}}
   return retainShape(candidate,normalizeDocument(mode === 'building',candidate),result)
 }
+
+
+export function editInputs(mode,document,id,order) {
+  return {...document,graph:retainedGraph(document,editGraphInputs(mode==='building',document,id,order))}
+}
+
+export const promoteNumbers=(mode,document)=>({...document,graph:retainedGraph(document,promoteNumberGraph(mode==='building',document))})

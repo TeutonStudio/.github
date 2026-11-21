@@ -1,20 +1,25 @@
+import {acceptsValue} from './value-compatibility.js'
+import {configureDocument} from './node-controls.js'
 import { selectNodes,clickNodes } from './selection.js'
 import { groupViews,viewWires,moveViewNodes,resolveViewConnection,insertSavedReference,splitVector } from './reference-groups.js'
 import { CopycatTransforms } from './CopycatTransforms.jsx'
 import { FileDialog, JsonDialog } from './FileDialog.jsx'
-import { appendVersion, identityOf } from './documents.js'
+import { appendVersion, identityOf, documentName, renameDocument, validDocumentName } from './documents.js'
 import { duplicateNodes, insertFormReference, savedReferences, viewLayout, versionResources } from './studio-actions.js'
 import { portStyle, portStyles } from './port-styles.js'
 import { lazy, memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
-import { Background, Controls, Handle, MiniMap, Position, ReactFlow, useUpdateNodeInternals } from '@xyflow/react'
+import { Background, Controls, MiniMap, ReactFlow, useUpdateNodeInternals } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { editNativeGroup, previewGraph, adaptRectangles, newNode, starterBuilding } from './generated/engine.mjs'
-import { applyWires, connections, formGroups, inspect, editNode, model, position, protectedNode, readGraph, replaceNodes, validateLibrary, writeGraph } from './model.js'
+import { promoteNumbers, applyWires, connections, formGroups, inspect, editNode, model, position, protectedNode, readGraph, replaceNodes, validateLibrary, writeGraph } from './model.js'
 import { NativeDocumentFields } from './NativeFields.jsx'
 import { DocumentFields, Field, names, NodeFields, portName } from './Inspector.jsx'
 import './style.css'
 import { SplitHandle } from './SplitHandle.jsx'
+import { SidePanels } from './SidePanels.jsx'
+import { ArrangementPanel } from './ArrangementGrid.jsx'
+import { authoringBuildingNode } from './generated/engine.mjs'
 import { Workspace, useWorkspace } from './Workspace.jsx'
 import { loadBuildingCopycat, loadFormCopycatWithMaterials } from './copycat-library.js'
 import { applyCopycatOption } from './copycat-selection.js'
@@ -34,8 +39,14 @@ import { cardResult,cardTypeLabel } from './card-types.js'
 import { newCard, openCard, graphCardEntry, copycatCardEntry } from './cards.js'
 import { AreaPreview } from './AreaPreview.jsx'
 
+// Keep the picker in the main bundle: switching dialogs must not depend on a stale deployment chunk.
+import CopycatPicker from './CopycatPicker.jsx'
+import { SelectionBoundary } from './SelectionBoundary.jsx'
+import { NodeDialog } from './NodeDialog.jsx'
+import { NodeAppearance } from './NodeAppearance.jsx'
+import {operatorFamily,switchOperator} from './operator-families.js'
+import { miniMapNodeColor } from './node-catalog.js'
 const Preview = lazy(() => import('./Preview.jsx'))
-const CopycatPicker = lazy(() => import('./CopycatPicker.jsx'))
 const wiki = 'https://github.com/TeutonStudio/copycat-architect/wiki'
 const examples = {
   form: [
@@ -48,27 +59,11 @@ const examples = {
 const query = new URLSearchParams(window.location.search)
 const initialMode = query.get('editor') === 'form' || query.get('graph') === 'copycat' ? 'form' : 'building'
 
-function DiagramNode({ id, data: { node, ports, groupName, outputType, hasOutput, diagnostic, reference, dynamicAxes=[], outputs=[] }, selected }) {
+function DiagramNode({id,data,selected}) {
   const updateInternals = useUpdateNodeInternals()
-  const signature = ports.map(port => port.id).join('|')+';'+outputs.map(output=>output.id).join('|')
+  const signature = data.ports.map(port => `${port.id}:${port.source || ''}`).join('|')+';'+(data.outputs || []).map(output=>output.id).join('|')
   useEffect(() => updateInternals(id), [id, signature, updateInternals])
-  const source = hasOutput ?? !['BUILDING', 'OUTPUT'].includes(node.kind)
-  return <div className={`diagram-node ${selected ? 'selected' : ''} ${diagnostic ? 'invalid' : ''} ${source ? '' : 'result-node'}`}>
-    <div className="node-heading">
-      <span className="node-symbol">{source ? portStyle(outputType).symbol : '◆'}</span>
-      <div><strong>{node.resultType ? "Ergebnis" : node.name || names[node.kind]}</strong><small>{node.resultType ? cardTypeLabel(node.resultType) : node.name ? names[node.kind] : node.id}{groupName ? ` · ${groupName}` : ''}</small></div>
-      {source && outputs.length<2 && <Handle type="source" position={Position.Right} id={outputs[0]?.id || "out"} style={{background:portStyle(outputType).color}} aria-label={`Ausgang · ${outputType}`} title={`Ausgang · ${outputType}`} />}
-    </div>
-    {outputs.length>1 && <div className="ports-output">{outputs.map(output=><div className="port" key={output.id}><span>{output.name}</span><Handle type="source" position={Position.Right} id={output.id} style={{background:portStyle(output.type).color}} title={`${output.name} · ${output.type}`} aria-label={`Ausgang ${output.name} · ${output.type}`}/></div>)}</div>}
-    {dynamicAxes.length>0 && <div className="node-reference">Dynamisch · {dynamicAxes.join(" / ")}</div>}
-    {reference && <div className="node-reference" title={`${reference.documentId}@${reference.version}`}>↗ {reference.name} · v{reference.version}</div>}
-    {diagnostic && <p className="node-diagnostic" role="alert" title={diagnostic}>⚠ {diagnostic}</p>}
-    {ports.length > 0 && <div className="ports">{ports.map(port => <div className="port" key={port.id}>
-      <Handle type="target" position={Position.Left} id={port.id} style={{background:portStyle(port.types?.[0]).color}} title={`${portName(port, node)} · ${(port.types || []).join(" / ")}`} />
-      <span>{port.name || portName(port, node)}</span>
-      <span className={`port-status ${port.source ? 'connected' : ''}`}>{port.source ? '●' : '○'}</span>
-    </div>)}</div>}
-  </div>
+  return <NodeAppearance data={data} selected={selected} />
 }
 
 const nodeTypes = { architect: memo(DiagramNode) }
@@ -110,7 +105,7 @@ function Studio({ mode, active }) {
   const rawViewedEntry = [...savedData.graphs.map(e=>({...e,collection:"graphs"})),...savedData.nodeGroups.map(e=>({...e,collection:"nodeGroups"}))].find(entry => entry.id === viewVersion)
   const viewedEntry = useMemo(()=>rawViewedEntry?graphCardEntry(rawViewedEntry,baseLibrary):null,[JSON.stringify(rawViewedEntry)])
   const readOnly = Boolean(viewedEntry)
-  const document = useMemo(() => viewedEntry ? viewLayout(readGraph(viewedEntry.document,mode),versionLayouts[viewedEntry.id]) : history.current,[viewedEntry,versionLayouts,history.current,mode])
+  const document = useMemo(() => viewedEntry ? {...viewLayout(readGraph(viewedEntry.document,mode),versionLayouts[viewedEntry.id]),name:documentName(savedData,fileIdentity,viewedEntry.name)} : {...history.current,name:documentName(savedData,draftIdentity,history.current.name)},[viewedEntry,versionLayouts,history.current,mode,savedData.documentNames,savedData.graphs,savedData.nodeGroups,fileIdentity,draftIdentity])
   const {library,materials} = versionResources(viewedEntry,draftLibrary,draftMaterials,baseLibrary)
   const versions = [...savedData.graphs,...savedData.nodeGroups].filter(entry => identityOf(entry) === fileIdentity).sort((a,b)=>(a.version || 1)-(b.version || 1))
   useEffect(()=>{if(viewVersion && !viewedEntry) {setViewVersion(null);setFileIdentity(draftIdentity)}},[viewVersion,viewedEntry,draftIdentity])
@@ -118,7 +113,8 @@ function Studio({ mode, active }) {
   // A source change also changes material mappings and library snapshots.
   const historyContext = useRef(new WeakMap())
   const [selectedIds, setSelectedIds] = useState([])
-  const [saveName, setSaveName] = useState('')
+  const [saveName, setSaveName] = useState(null)
+  const pickerOrigin=useRef(null)
   const [referenceDialog,setReferenceDialog]=useState(false),[referenceTarget,setReferenceTarget]=useState(null),[groupPreview,setGroupPreview]=useState({})
   const [fileDialog,setFileDialog] = useState(false), [jsonDialog,setJsonDialog] = useState(false)
   const [contextMenu,setContextMenu] = useState(null)
@@ -136,12 +132,13 @@ function Studio({ mode, active }) {
   const [dragging, setDragging] = useState({})
   const [message, setMessage] = useState(null)
   const [flow, setFlow] = useState(null)
-  const [kind, setKind] = useState('')
+  const [nodeDialog, setNodeDialog] = useState(false)
   const [workspace, setWorkspace] = useState(0)
   // React Flow measurements belong to the view, never to the Minecraft document.
   const [nodeMeasurements, setNodeMeasurements] = useState({})
   const [graphShare, setGraphShare] = useState(68)
-  const [previewShare, setPreviewShare] = useState(55)
+  const [arrangementCollapsed,setArrangementCollapsed] = useState(false)
+  const [arrangementDraft,setArrangementDraft] = useState(null)
   const [previewCollapsed, setPreviewCollapsed] = useState(false)
   const [inspectorCollapsed, setInspectorCollapsed] = useState(false)
   const [previewMode, setPreviewMode] = useState('graph')
@@ -157,16 +154,16 @@ function Studio({ mode, active }) {
   const current = entries.find(({ node }) => node.id === (selectedGroup ? groupPreview[selectedGroup.id] || selectedGroup.previewId : selected))
   const resultNode = entries.find(({node})=>node.id===cardResult(document).id)
   const visibleNode = current ?? resultNode
-  const kinds = mode === 'form' ? model.form.map(type => type.kind).filter(kind => kind !== 'OUTPUT' && !['POSITION_Y','POSITION_Z'].includes(kind)) : model.building.filter(kind => !['POSITION_Y','POSITION_Z'].includes(kind))
+  const kinds = mode === 'form' ? model.form.map(type => type.kind).filter(kind => kind !== 'OUTPUT' && !['POSITION_Y','POSITION_Z'].includes(kind)) : model.building.filter(kind => !['POSITION_Y','POSITION_Z'].includes(kind) && !(model.building.includes('SERVICE_SHAFT_SEGMENT') && ['SERVICE_SHAFT','ELEVATOR_SHAFT'].includes(kind)) && !(model.directAreas && ['SEGMENT_LAYOUT','ROOM_GEOMETRY','ROOF_LEVEL','ROOF_LAYOUT'].includes(kind)))
   const edgeId = ({ target, port }) => `${target}/${port}`
   const nodes = useMemo(() => {
     const hidden=new Set(foldedGroups.flatMap(group=>group.nodes))
     const ordinary=entries.filter(data=>!hidden.has(data.node.id)).map(data=>({
-      id:data.node.id,type:'architect',data:{...data,reference:document.graph.nodes.find(node=>node.id===data.node.id)?.libraryReference,diagnostic:diagnostics.find(item=>item.nodeId===data.node.id)?.message,hasOutput:data.node.id!==resultNode.node.id,groupName:document.graph.nodeGroups?.find(group=>group.nodes.includes(data.node.id))?.name},position:dragging[data.node.id] || {x:data.node.x,y:data.node.y},selected:selectedIds.includes(data.node.id),measured:nodeMeasurements[data.node.id]
+      id:data.node.id,type:'architect',data:{...data,mode,onInputOrder:readOnly?undefined:order=>transact(()=>commit(configureDocument(mode,document,data.node.id,'$inputOrder',order))),onControl:readOnly?undefined:(path,value)=>transact(()=>commit(configureDocument(mode,document,data.node.id,path,value))),onOperation:readOnly?undefined:kind=>changeOperation(data.node.id,kind),reference:document.graph.nodes.find(node=>node.id===data.node.id)?.libraryReference,diagnostic:diagnostics.find(item=>item.nodeId===data.node.id)?.message,hasOutput:data.node.id!==resultNode.node.id,groupName:document.graph.nodeGroups?.find(group=>group.nodes.includes(data.node.id))?.name},position:dragging[data.node.id] || {x:data.node.x,y:data.node.y},selected:selectedIds.includes(data.node.id),measured:nodeMeasurements[data.node.id]
     }))
-    const grouped=foldedGroups.map(group=>({id:group.id,type:'architect',position:dragging[group.id] || group.position,selected:selectedIds.includes(group.id),measured:nodeMeasurements[group.id],data:{node:{id:group.id,kind:group.presentation==='vectorSplit'?'VECTOR_SPLIT':'REFERENCE',name:group.name},ports:group.ports.map(port=>({...port,name:port.name || portName({...port,id:port.targetPort},entries.find(e=>e.node.id===port.targetNode).node)})),outputs:group.outputs,outputType:group.outputs[0]?.type,hasOutput:group.outputs.length>0,reference:group.libraryReference,diagnostic:diagnostics.find(item=>group.nodes.includes(item.nodeId))?.message}}))
+    const grouped=foldedGroups.map(group=>({id:group.id,type:'architect',position:dragging[group.id] || group.position,selected:selectedIds.includes(group.id),measured:nodeMeasurements[group.id],data:{node:{id:group.id,kind:group.presentation==='vectorSplit'?'VECTOR_SPLIT':'REFERENCE',name:group.name},mode,onOperation:group.presentation==='vectorSplit'&&!readOnly?kind=>changeOperation(group.id,kind):undefined,ports:group.ports.map(port=>({...port,name:port.name || portName({...port,id:port.targetPort},entries.find(e=>e.node.id===port.targetNode).node)})),outputs:group.outputs,outputType:group.outputs[0]?.type,hasOutput:group.outputs.length>0,reference:group.libraryReference,diagnostic:diagnostics.find(item=>group.nodes.includes(item.nodeId))?.message}}))
     return [...ordinary,...grouped]
-  },[entries,document,foldedGroups,dragging,selectedIds,nodeMeasurements,diagnostics])
+  },[entries,document,foldedGroups,dragging,selectedIds,nodeMeasurements,diagnostics,readOnly,mode])
   const onNodesChange = useCallback(changes => {
     if(changes.some(change=>change.type==='select')) setSelectedIds(previous=>selectNodes(previous,changes))
     const measured = changes.filter(change => change.type === 'dimensions' && change.dimensions)
@@ -193,17 +190,20 @@ function Studio({ mode, active }) {
 
   const transact = callback => {
     try {
-      callback()
       setMessage(null)
+      callback()
     } catch (error) {
       setMessage({ error: true, text: error.message || String(error) })
     }
   }
   const commit = next => {
     if (readOnly) throw new Error('Gespeicherte Version: nur Betrachten. Zum Bearbeiten Ungespeichert wählen.')
-    inspect(mode, next)
+    const nextEntries=inspect(mode,next),nextWires=connections(nextEntries)
+    const removed=wires.filter(wire=>!nextWires.some(w=>w.source===wire.source&&w.target===wire.target&&w.port===wire.port)&&nextEntries.some(e=>e.node.id===wire.source&&e.outputType!==entries.find(old=>old.node.id===wire.source)?.outputType))
+    if(removed.length)setMessage({text:`${removed.length} inkompatible Verbindung${removed.length===1?' wurde':'en wurden'} wegen des Typwechsels getrennt. Rückgängig stellt sie wieder her.`})
+    if(next.name !== document.name && draftIdentity) updateWorkspace(data=>renameDocument(data,draftIdentity,next.name))
     if (JSON.stringify(next) !== JSON.stringify(document)) {
-      historyContext.current.set(document, { library, materials })
+      historyContext.current.set(history.current, { library, materials })
       // Reopening the same example must create a distinct history entry.
       history.push(structuredClone(next))
     }
@@ -212,7 +212,7 @@ function Studio({ mode, active }) {
     if (readOnly) return
     const next = direction === 'undo' ? history.past.at(-1) : history.future[0]
     if (!next) return
-    historyContext.current.set(document, { library, materials })
+    historyContext.current.set(history.current, { library, materials })
     const context = historyContext.current.get(next)
     if (context) { setLibrary(context.library); setMaterials(context.materials) }
     history[direction]();setSelectedIds(ids=>ids.filter(id=>next.graph.nodes.some(node=>node.id === id)));setSelected(id=>next.graph.nodes.some(node=>node.id === id) ? id : null)
@@ -222,6 +222,7 @@ function Studio({ mode, active }) {
     let updated = { ...document.graph.nodes.find(item => item.id === node.id), ...patch }
     commit(editNode(mode, document, updated))
   })
+  function changeOperation(id,kind) {transact(()=>commit(switchOperator(mode,document,id,kind)))}
   const setWire = (target, port, source) => transact(() => {
     const rest = wires.filter(wire => wire.target !== target || wire.port !== port)
     commit(applyWires(mode, document, entries, source ? [...rest, { source, target, port }] : rest))
@@ -241,7 +242,7 @@ function Studio({ mode, active }) {
   }
   const open = raw => {
     setPreviewMode('graph')
-    setFileIdentity(null);setDraftIdentity(null);setSaveName('');setFileDialog(false)
+    setFileIdentity(null);setDraftIdentity(null);setSaveName(null);setFileDialog(false)
     const opened=openCard({document:raw},baseLibrary)
     setViewVersion(null);history.reset(opened.document);setLibrary(opened.library);setMaterials(opened.materials)
     setSelected(null)
@@ -250,16 +251,21 @@ function Studio({ mode, active }) {
     setNodeMeasurements({})
     setWorkspace(key => key + 1)
   }
-  const add = () => transact(() => {
-    if (!kind) return
-    if(mode==='building' && kind==='COPYCAT') {setReferenceTarget(null);setReferenceDialog(true);return}
+  const add = (choice,screenPoint) => transact(() => {
+    const kind=typeof choice==='string'?choice:choice.kind
+    if (!kind || readOnly || count >= maxNodes) return
+    setNodeDialog(false)
     const { left, top, width, height } = canvas.current.getBoundingClientRect()
-    const center = flow?.screenToFlowPosition({ x: left + width * 0.5, y: top + height * 0.4 }) ?? { x: 50, y: 50 }
+    const center = flow?.screenToFlowPosition(screenPoint || { x: left + width * 0.5, y: top + height * 0.4 }) ?? { x: 50, y: 50 }
+    pickerOrigin.current=null
+    if(mode==='building' && kind==='COPYCAT') {pickerOrigin.current=center;setReferenceTarget(null);setReferenceDialog(true);return}
     if(kind==='POSITION_X') {const result=splitVector(mode,document,null,{x:position(center.x),y:position(center.y)});commit(result.document);setSelected(result.nodeId);setSelectedIds([result.nodeId]);return}
     const id = `node_${crypto.randomUUID().slice(0, 13)}`
-    const node = newNode(mode === 'building', kind, id, position(center.x), position(center.y), true)
+    const created = newNode(mode === 'building', kind, id, position(center.x), position(center.y), true)
+    const node = {...(mode==='building'?authoringBuildingNode(created):created),...(typeof choice==='object'?choice:{}),id,x:position(center.x),y:position(center.y)}
     if (kind === 'INPUT') node.part.group = formGroups(document)[0].id
-    commit(replaceNodes(document, [...document.graph.nodes, node]))
+    const target=operatorFamily(mode,kind)?.id==='numbers'?promoteNumbers(mode,document):document
+    commit(replaceNodes(target, [...target.graph.nodes, node]))
     setSelected(id)
     if(kind==='AREA') setPreviewMode('selected')
     setSelectedIds([id])
@@ -275,8 +281,8 @@ function Studio({ mode, active }) {
   const compatible = connection => {
     const resolved=resolveViewConnection(connection,foldedGroups)
     const targets=resolved.targets || [{target:resolved.target,port:resolved.port}]
-    const kind=entries.find(entry=>entry.node.id===resolved.source)?.node.kind
-    return targets.length>0 && targets.every(target=>resolved.source!==target.target && Boolean(entries.find(entry=>entry.node.id===target.target)?.ports.find(port=>port.id===target.port)?.accepts.includes(kind)))
+    const source=entries.find(entry=>entry.node.id===resolved.source)
+    return targets.length>0 && targets.every(target=>resolved.source!==target.target && acceptsValue(entries.find(entry=>entry.node.id===target.target)?.ports.find(port=>port.id===target.port),source))
   }
   const connectView = connection => transact(()=>{
     const resolved=resolveViewConnection(connection,foldedGroups),targets=resolved.targets || [{target:resolved.target,port:resolved.port}]
@@ -312,15 +318,17 @@ function Studio({ mode, active }) {
   }
   const savedForms = useMemo(() => savedData.graphs.filter(entry => entry.mode === 'form' || cardResult(entry.document)?.resultType==='COPYCAT').flatMap(entry=>{try{return [copycatCardEntry(entry,baseLibrary)]}catch{return []}}), [savedData.graphs])
   const chooseCopycat = (nodeId,basic=false) => {
+    if(nodeId) pickerOrigin.current=null
     if(mode==='building' && !basic) {setReferenceTarget(nodeId || null);setReferenceDialog(true);return}
     if (readOnly) return
     setFileDialog(false)
     const node = entries.find(entry => entry.node.id === nodeId)?.node
     const initialId = node?.inlinePart ? `base:${node.inlinePart.source}` : node?.kind === 'INPUT' ? `base:${node.part.source}` : node?.kind === 'COPYCAT' ? `library:${node.form}` : null
-    setCopycatPicker({ nodeId, initialId, initialCategory: node && node.kind !== 'INPUT' && !node.inlinePart ? 'saved' : 'basic' })
+    setCopycatPicker({ nodeId, initialId: basic && !node?.inlinePart && node?.kind !== 'INPUT' ? null : initialId, initialCategory: basic ? 'basic' : node && node.kind !== 'INPUT' && !node.inlinePart ? 'saved' : 'basic' })
   }
   const applyCopycat = option => {
     const result = applyCopycatOption({ mode, document, library, materials, nodeId: copycatPicker.nodeId, option })
+    locatePickerResult(result)
     const next={...result.document,graph:{...result.document.graph,nodes:result.document.graph.nodes.map(node=>{if(node.id !== result.nodeId) return node;const {libraryReference,...copy}=node;return copy})}}
     commit(next)
     setLibrary(result.library); setMaterials(result.materials); setSelected(result.nodeId); setSelectedIds([result.nodeId])
@@ -328,9 +336,16 @@ function Studio({ mode, active }) {
   }
   const count = entries.length
   const maxNodes = mode === 'form' ? model.formNodes : model.buildingNodes
-  const portLimits = mode === 'form' ? model.form.find(type => type.kind === visibleNode.node.kind)
-    : model.buildingInputs[visibleNode.node.kind] ?? null
-  const isFormSourceLimit = ['INPUT', 'SAVED'].includes(kind) && entries.filter(({ node }) => ['INPUT', 'SAVED'].includes(node.kind)).length >= model.formSources
+  const arrangementNode=mode==='building' && current && !selectedGroup && (['PATTERN','STOREY'].includes(current.node.kind) || ['SEGMENT_UNION','SEGMENT_INTERSECTION','SEGMENT_DIFFERENCE','SEGMENT_SYMMETRIC_DIFFERENCE','SEGMENT_ROTATE','SEGMENT_MIRROR','SEGMENT_TRANSFORM'].includes(current.node.kind)) ? current.node : null
+  useEffect(()=>{if(arrangementNode?.kind==='STOREY')setPreviewMode('selected')},[arrangementNode?.id,arrangementNode?.kind])
+  const onArrangementPreview=useCallback(patch=>setArrangementDraft(patch?{id:arrangementNode?.id,patch}:null),[arrangementNode?.id])
+  const previewDocument=useMemo(()=>{
+    if(!arrangementDraft || arrangementDraft.id!==arrangementNode?.id) return document
+    try {return editNode(mode,document,{...arrangementNode,...arrangementDraft.patch})} catch {return document}
+  },[document,arrangementDraft,arrangementNode,mode])
+  const removableWire=selectedIds.length<2 && wires.some(wire=>edgeId(wire)===selectedWire)
+  const canRemove=!readOnly && (removableWire || editableIds.length>0)
+  const removeLabel=removableWire?'Verbindung trennen':selectedIds.length>1?'Auswahl löschen':selectedGroup?'Referenzknoten löschen':'Knoten löschen'
   const previewSelected = current?.node.id ?? ''
   const areaTarget=previewMode==='selected' ? current?.node.kind==='AREA'?current.node.id:current?.node.resultType==='AREA'?current.node.inputs[0]:null : cardResult(document).resultType==='AREA'?cardResult(document).inputs[0]:null
   const areaPreviewNode=entries.find(entry=>entry.node.id===areaTarget)?.node
@@ -363,7 +378,7 @@ function Studio({ mode, active }) {
   })
   const save = (asNew = false) => transact(() => {
     if(readOnly && !asNew) return
-    const name=saveName.trim() || document.name || 'Graph'
+    const name=validDocumentName(saveName?.trim() || document.name || 'Graph')
     if(savedData.graphs.length >= 500) throw new Error('Höchstens 500 Speicherstände. Nicht benötigte Versionen zuerst löschen.')
     const identity=asNew ? null : fileIdentity
     const collection=!asNew && savedData.nodeGroups.some(e=>identityOf(e)===fileIdentity)?"nodeGroups":"graphs"
@@ -371,16 +386,18 @@ function Studio({ mode, active }) {
     if(payload) {const result=cardResult(document);payload.graphInterface={inputs:document.cardInterface?.inputs || [],outputs:[{id:'result',name:'Ergebnis',type:result.resultType,member:payload.nodes.findIndex(n=>n.id===result.inputs[0])}]}}
     const next=appendVersion(savedData[collection],{...payload,name,mode,document:writeGraph(mode,{...document,name}),library,materials,references:savedReferences(document)},identity)
     const proposed=next.at(-1)
-    const accepted=updateWorkspace(data => ({...data,[collection]:appendVersion(data[collection],{...proposed},identity || proposed.documentId)}))
+    const accepted=updateWorkspace(data => renameDocument({...data,[collection]:appendVersion(data[collection],{...proposed},identity || proposed.documentId)},identity || proposed.documentId,name))
     const entry=accepted[collection].at(-1)
     if(readOnly) {history.reset({...document,name});setLibrary(library);setMaterials(materials);setViewVersion(null)}
+    else if(history.current.name !== name) history.push({...document,name})
+    setSaveName(null)
     setFileIdentity(entry.documentId);setDraftIdentity(entry.documentId);setMessage({text:`${name} · Version ${entry.version} gespeichert.`})
   })
   const openEntry = entry => transact(() => {
     setPreviewMode('graph')
     graphCardEntry(entry,baseLibrary)
     const identity=identityOf(entry)
-    setViewVersion(entry.id);setFileIdentity(identity);setSaveName(entry.name);setSelected(null);setSelectedIds([]);setSelectedWire(null);setWorkspace(key=>key+1)
+    setViewVersion(entry.id);setFileIdentity(identity);setSaveName(null);setSelected(null);setSelectedIds([]);setSelectedWire(null);setWorkspace(key=>key+1)
     setFileDialog(false)
   })
   const selectVersion = id => {
@@ -390,20 +407,32 @@ function Studio({ mode, active }) {
         history.reset(parked?.document || graphCardEntry(baseline,baseLibrary).document);setLibrary(parked?.library || baseline?.library || baseLibrary);setMaterials(parked?.materials || baseline?.materials || {});setDraftIdentity(fileIdentity)
       }
     }
-    setViewVersion(id || null);setRenaming(false);setSelectedWire(null);setContextMenu(null)
+    setViewVersion(id || null);setSaveName(null);setRenaming(false);setSelectedWire(null);setContextMenu(null)
+  }
+  const locatePickerResult = result => {
+    const origin=pickerOrigin.current
+    if(!origin) return
+    const next=result.document
+    const groups=groupViews(next,inspect(mode,next))
+    const moved=moveViewNodes(next,groups,[{id:result.nodeId,position:origin}])
+    result.document=replaceNodes(next,next.graph.nodes.map(node=>moved[node.id]?{...node,...moved[node.id]}:node))
+    pickerOrigin.current=null
   }
   const insertReference = entry => transact(() => {
     if(readOnly) return
     const result=insertSavedReference({mode,document,library,materials,entry,currentIdentity:fileIdentity,targetId:referenceDialog?referenceTarget:null})
+    locatePickerResult(result)
     commit(result.document);setLibrary(result.library);setMaterials(result.materials);setSelected(result.nodeId);setSelectedIds([result.nodeId]);setSelectedWire(null);setFileDialog(false);setReferenceDialog(false);setReferenceTarget(null);setWorkspace(key=>key+1)
   })
   const splitPosition=()=>transact(()=>{const result=splitVector(mode,document,visibleNode.node.id);commit(result.document);setSelected(result.nodeId);setSelectedIds([result.nodeId])})
   const unpackReference=()=>transact(()=>{commit({...document,graph:{...document.graph,nodeGroups:document.graph.nodeGroups.map(group=>group.id===selectedGroup.id?{...group,libraryReference:null,presentation:null}:group)}});setSelected(null);setSelectedIds([])})
-  const rename = () => transact(() => {
-    const name=nameDraft.trim()
-    if(!name || name.length>64 || /[\x00-\x1f]/.test(name)) throw new Error('Der Name benötigt 1–64 sichtbare Zeichen.')
-    commit({...document,name});setSaveName(name);setRenaming(false)
-  })
+  const renameTo = value => {
+    const name=validDocumentName(value)
+    if(fileIdentity) updateWorkspace(data=>renameDocument(data,fileIdentity,name))
+    else history.push({...document,name})
+    setSaveName(null);setRenaming(false)
+  }
+  const rename = () => transact(() => renameTo(nameDraft))
   const keydown = event => {
     if (event.target.closest('input, textarea, select, [contenteditable=true]')) return
     if(readOnly) {if(['Delete','Backspace'].includes(event.key) || (event.ctrlKey || event.metaKey) && ['d','z','y'].includes(event.key.toLowerCase())) event.preventDefault();return}
@@ -425,7 +454,12 @@ function Studio({ mode, active }) {
     return ()=>window.removeEventListener('keydown',handler)
   },[active,keydown])
   return <div className="studio" hidden={!active}>
-    {referenceDialog && <FileDialog mode={mode} library={library} referenceOnly currentIdentity={fileIdentity} readOnly={readOnly} onChoose={insertReference} onReference={insertReference} onClose={()=>setReferenceDialog(false)} actions={!foldedGroups.some(group=>group.id===referenceTarget) && <button onClick={()=>{setReferenceDialog(false);chooseCopycat(referenceTarget,true)}}>Grundform wählen …</button>} />}
+    {nodeDialog && <NodeDialog mode={mode} onPlace={(kind,point)=>{
+      const rect=canvas.current.getBoundingClientRect()
+      if(point.x<rect.left || point.x>rect.right || point.y<rect.top || point.y>rect.bottom || readOnly || count>=maxNodes) return false
+      add(kind,point);return true
+    }} properties={model.nodeProperties[mode]} kinds={kinds} count={count} maxNodes={maxNodes} onAdd={add} onClose={()=>setNodeDialog(false)} />}
+    {referenceDialog && <FileDialog mode={mode} library={library} referenceOnly currentIdentity={fileIdentity} readOnly={readOnly} onChoose={insertReference} onReference={insertReference} onClose={()=>{pickerOrigin.current=null;setReferenceDialog(false)}} actions={!foldedGroups.some(group=>group.id===referenceTarget) && <button onClick={()=>transact(()=>{chooseCopycat(referenceTarget,true);setReferenceDialog(false)})}>Grundform wählen …</button>} />}
     {fileDialog && <FileDialog mode={mode} library={library} currentIdentity={fileIdentity} readOnly={readOnly} onChoose={openEntry} onReference={insertReference} onClose={() => setFileDialog(false)} actions={<>    <div className="toolbar">
       <label className="example-select"><span>BEISPIELE</span><select aria-label="Beispiel öffnen" value="" onChange={e => transact(() => open(examples[mode][Number(e.target.value)][1]))}>
         <option value="" disabled>Beispiel öffnen</option>
@@ -445,12 +479,11 @@ function Studio({ mode, active }) {
       <button type="button" onClick={() => graphInput.current.click()}>Import …</button><button type="button" className="primary" onClick={exportFile}>Export …</button><button type="button" disabled={readOnly} onClick={() => setJsonDialog(true)}>JSON bearbeiten</button>
       <button type="button" onClick={copyJson}>Minecraft-JSON kopieren</button>
       <span className="toolbar-spacer" />
-      <button type="button" aria-label="Rückgängig" title="Rückgängig" disabled={readOnly || !history.past.length} onClick={() => travelHistory('undo')}>↶</button>
-      <button type="button" aria-label="Wiederholen" title="Wiederholen" disabled={readOnly || !history.future.length} onClick={() => travelHistory('redo')}>↷</button>
+
     </div>
 
     <div className="personal-library-bar">
-      <label>Name für Bibliothek<input aria-label="Name für Bibliothek" placeholder={document.name || 'Mein Entwurf'} maxLength={64} value={saveName} onChange={event => setSaveName(event.target.value)} /></label>
+      <label>Graphname<input aria-label="Name für Bibliothek" maxLength={64} value={saveName ?? document.name ?? ''} onChange={event => setSaveName(event.target.value)} onBlur={event=>{if(event.target.value !== document.name) transact(()=>renameTo(event.target.value))}} /></label>
       <button disabled={readOnly} onClick={() => save()}>Speichern</button><button onClick={() => save(true)}>Speichern unter …</button>
 
     </div>
@@ -470,19 +503,18 @@ function Studio({ mode, active }) {
       <section className="canvas-panel" aria-label="Graph bearbeiten">
         <div className="panel-heading graph-heading">
           <div className="graph-identity">
-            {renaming ? <form className="graph-rename" onSubmit={event=>{event.preventDefault();rename()}}><input autoFocus aria-label="Graphname" maxLength={64} value={nameDraft} onChange={event=>setNameDraft(event.target.value)} onKeyDown={event=>{if(event.key === 'Escape') setRenaming(false)}}/><button aria-label="Name übernehmen">✓</button></form> : <strong className="graph-name" title={viewedEntry?.name || document.name}>{viewedEntry?.name || document.name || 'Entwurf'}</strong>}
-            <button type="button" disabled={readOnly} aria-label="Graphnamen ändern" title="Graphnamen ändern" onClick={()=>{setNameDraft(document.name || '');setRenaming(true)}}>✎</button>
+            {renaming ? <form className="graph-rename" onSubmit={event=>{event.preventDefault();rename()}}><input autoFocus aria-label="Graphname" maxLength={64} value={nameDraft} onBlur={rename} onChange={event=>setNameDraft(event.target.value)} onKeyDown={event=>{if(event.key === 'Escape') setRenaming(false)}}/><button aria-label="Name übernehmen">✓</button></form> : <strong className="graph-name" title={viewedEntry?.name || document.name}>{viewedEntry?.name || document.name || 'Entwurf'}</strong>}
+            <button type="button" aria-label="Graphnamen ändern" title="Graphnamen ändern" onClick={()=>{setNameDraft(document.name || '');setRenaming(true)}}>✎</button>
             <select aria-label="Graphversion" value={viewedEntry?.id || ''} onChange={event=>selectVersion(event.target.value)}><option value="">Ungespeichert</option>{versions.map(entry=><option key={entry.id} value={entry.id}>v{entry.version || 1}</option>)}</select>
             {!readOnly && <button type="button" className="save-version" onClick={()=>save(false)}>Als v{1+Math.max(0,...versions.map(entry=>entry.version || 1))} speichern</button>}
             <button type="button" onClick={()=>setFileDialog(true)}>Bibliothek</button>
             <small>{count} / {maxNodes}{readOnly ? ' · Betrachten' : ''}</small>
           </div>
-          <div className="button-row">
-            <select disabled={readOnly} aria-label="Knotentyp" value={kind} onChange={event => setKind(event.target.value)}>
-              <option value="" disabled>Knotentyp</option>
-              {kinds.map(kind => <option key={kind} value={kind}>{kind==='POSITION_X'?'Position zerlegen':kind==='POSITION'?'Position zusammenführen (hB)':names[kind]}</option>)}
-            </select>
-            <button type="button" disabled={readOnly || !kind || count >= maxNodes || isFormSourceLimit} onClick={add}>+ Knoten</button>
+          <div className="button-row graph-actions" role="group" aria-label="Graphaktionen">
+            <button type="button" aria-label="Rückgängig" title="Rückgängig · Strg+Z" disabled={readOnly || !history.past.length} onClick={()=>travelHistory('undo')}>↶</button>
+            <button type="button" aria-label="Wiederholen" title="Wiederholen · Strg+Y" disabled={readOnly || !history.future.length} onClick={()=>travelHistory('redo')}>↷</button>
+            <button type="button" className="danger" disabled={!canRemove} onClick={removeSelection} title={`${removeLabel} · Entf`}>{removeLabel}</button>
+            <button type="button" disabled={readOnly || count >= maxNodes} onClick={()=>setNodeDialog(true)}>+ Knoten</button>
           </div>
         </div>
         <div className="canvas" ref={canvas}>
@@ -491,14 +523,14 @@ function Studio({ mode, active }) {
             selectNodesOnDrag={false} onNodeDragStart={(_,node)=>{setSelected(node.id);if(!selectedIds.includes(node.id))setSelectedIds([node.id])}} onNodeDrag={onDrag} onNodeDragStop={onDragStop} deleteKeyCode={null} nodesConnectable={!readOnly} edgesReconnectable={false}
             onNodeContextMenu={(event,node) => {event.preventDefault();if (!selectedIds.includes(node.id)) {setSelectedIds([node.id]);setSelected(node.id)}setContextMenu({x:Math.min(event.clientX,window.innerWidth-220),y:Math.min(event.clientY,window.innerHeight-90)})}}
             onNodeClick={(event, node) => { const ids=clickNodes(selectedIds,node.id,event.shiftKey || event.ctrlKey || event.metaKey);setSelected(ids.includes(node.id)?node.id:ids.at(-1) || null); if(entries.find(entry=>entry.node.id===node.id)?.node.kind==='AREA') setPreviewMode('selected'); setSelectedWire(null); setSelectedIds(ids); }}
-            onEdgeClick={(_, edge) => { setSelectedWire(edge.id); setSelected(edge.target) }}
+            onEdgeClick={(_, edge) => { setSelectedWire(edge.id); setSelected(edge.target); setSelectedIds([]) }}
             onPaneClick={() => { setContextMenu(null);setSelected(null); setSelectedWire(null); setSelectedIds([]) }}
             isValidConnection={compatible} onConnect={connectView}
             selectionKeyCode="Shift" multiSelectionKeyCode={["Shift","Control","Meta"]} onlyRenderVisibleElements
             colorMode="dark" aria-label="React-Flow-Graph">
             <Background gap={22} size={1} color="#46606d" />
             <Controls showInteractive={false} />
-            <MiniMap pannable zoomable nodeColor="#659a9c" maskColor="#18232c88" />
+            <MiniMap pannable zoomable style={{width:120,height:78}} nodeColor={miniMapNodeColor} maskColor="#18232c88" />
           </ReactFlow>}
         </div>
         <details className="port-legend"><summary>Anschlüsse · Legende</summary><ul>{Object.entries(portStyles).map(([key,style]) => <li key={key}><span style={{color:style.color}}>{style.symbol}</span>{style.name}</li>)}</ul><small>X / Y / Z kennzeichnen zusätzlich die Achsen. Die Typregeln bestimmen die Verbindung.</small></details>
@@ -507,20 +539,19 @@ function Studio({ mode, active }) {
         </div>
       </section>
       <SplitHandle axis="x" value={graphShare} onChange={setGraphShare} label="Breite von Graph und Seitenleiste" />
-      <div className={`side${previewCollapsed && inspectorCollapsed ? ' both-collapsed' : ''}`}
-        style={{ gridTemplateRows: previewCollapsed && inspectorCollapsed ? 'auto auto' : previewCollapsed ? 'auto minmax(0, 1fr)' : inspectorCollapsed ? 'minmax(0, 1fr) auto' : `minmax(0, ${previewShare}fr) 10px minmax(0, ${100-previewShare}fr)` }}>
+      <SidePanels showArrangement={Boolean(arrangementNode)} collapsed={{preview:previewCollapsed,arrangement:arrangementCollapsed,inspector:inspectorCollapsed}}>
         {active && mode==='building' && areaPreviewNode ? <AreaPreview node={areaPreviewNode} document={document} readOnly={readOnly} edit={patch=>transact(()=>commit(editNode(mode,document,{...document.graph.nodes.find(node=>node.id===areaPreviewNode.id),...patch})))} previewMode={previewMode} onMode={setPreviewMode} collapsed={previewCollapsed} onToggle={()=>setPreviewCollapsed(value=>!value)}/> : active && <Suspense fallback={<section className="preview-panel"><div className="preview-meta">3D-Vorschau wird geladen …</div></section>}>
-          <Preview onDiagnostics={setDiagnostics} mode={mode} document={document} library={library} selected={previewSelected} materials={materials}
+          <Preview onDiagnostics={setDiagnostics} mode={mode} document={previewDocument} library={library} selected={previewSelected} materials={materials}
             previewMode={previewMode} onMode={setPreviewMode} collapsed={previewCollapsed} onToggle={() => setPreviewCollapsed(value => !value)} />
         </Suspense>}
-        {!previewCollapsed && !inspectorCollapsed && <SplitHandle axis="y" value={previewShare} onChange={setPreviewShare} label="Höhenverhältnis von 3D-Vorschau und Inspektor" />}
+        {arrangementNode && <ArrangementPanel key={arrangementNode.id} node={arrangementNode} document={document} library={library} readOnly={readOnly} edit={patch=>transact(()=>commit(editNode(mode,document,{...arrangementNode,...patch})))} onPreview={onArrangementPreview} collapsed={arrangementCollapsed} onToggle={()=>setArrangementCollapsed(value=>!value)}/>}
         <section className={`inspector${inspectorCollapsed ? ' is-collapsed' : ''}`} aria-label="Knoteninspektor">
           <div className="panel-heading"><span>Inspektor</span><div className="button-row"><small>{current ? 'AUSWAHL' : 'ERGEBNIS'}</small>
             <button type="button" aria-expanded={!inspectorCollapsed} aria-controls={`${mode}-inspector`} aria-label={inspectorCollapsed ? 'Inspektor ausklappen' : 'Inspektor einklappen'} onClick={() => setInspectorCollapsed(value => !value)}>{inspectorCollapsed ? '▸' : '▾'}</button>
           </div></div>
           <div id={`${mode}-inspector`} className="inspector-body" hidden={inspectorCollapsed} key={visibleNode.node.id}>
             {selectedIds.length > 1 ? <section className="collection-data" aria-label="Sammlungsdaten"><h2>Sammlungsdaten</h2><p>{selectedIds.length} Knoten ausgewählt · {editableIds.length} bearbeitbar</p><fieldset disabled={readOnly || !editableIds.length} className="inspector-controls"><div className="collection-actions">
-              <button className="danger" onClick={removeSelection}>Auswahl löschen</button>
+
               <button onClick={()=>duplicate(false)}>Duplizieren ohne Verbindungen</button>
               <button onClick={()=>duplicate(true)}>Duplizieren mit Verbindungen</button>
               <label>Gruppenname<input value={groupName} maxLength={64} onChange={event=>setGroupName(event.target.value)}/></label>
@@ -529,44 +560,36 @@ function Studio({ mode, active }) {
             {readOnly && <p className="hint">Gespeicherte Version · nur Betrachten. Positionen sind Ansichtsänderungen.</p>}
             {document.graph.nodes.find(node=>node.id === visibleNode.node.id)?.libraryReference && <p className="hint">Referenz: {document.graph.nodes.find(node=>node.id === visibleNode.node.id).libraryReference.name} · v{document.graph.nodes.find(node=>node.id === visibleNode.node.id).libraryReference.version}</p>}
             <fieldset className="inspector-controls" disabled={readOnly}>
-            {selectedGroup ? <><h2>{selectedGroup.name}</h2>{selectedGroup.libraryReference && <p>Referenz · v{selectedGroup.libraryReference.version}</p>}<p className="hint">{selectedGroup.nodes.length} gespeicherte Knoten · {selectedGroup.outputs.length} typisierte Ausgänge</p>{selectedGroup.outputs.length>1 && <label>Vorschauausgang<select aria-label="Vorschauausgang" value={current?.node.id || ''} onChange={e=>setGroupPreview(value=>({...value,[selectedGroup.id]:e.target.value}))}>{selectedGroup.outputs.map(output=><option key={output.id} value={output.id}>{output.name} · {output.type}</option>)}</select></label>}{selectedGroup.ports.map(port=><Field key={port.id} label={port.name || portName({...port,id:port.targetPort},entries.find(e=>e.node.id===port.targetNode).node)} value={port.source} options={[[ '', 'Offen' ],...entries.filter(entry=>!selectedGroup.nodes.includes(entry.node.id) && port.accepts.includes(entry.node.kind)).map(entry=>[entry.node.id,entry.node.name || names[entry.node.kind]])]} onChange={source=>{if(source) connectView({source,target:selectedGroup.id,targetHandle:port.id});else transact(()=>{const targets=port.targets || [{target:port.targetNode,port:port.targetPort}];commit(applyWires(mode,document,entries,wires.filter(wire=>!targets.some(target=>target.target===wire.target && target.port===wire.port))))})}}/>)}{selectedGroup.libraryReference && <button onClick={()=>{setReferenceTarget(selectedGroup.id);setReferenceDialog(true)}}>Referenz auswählen …</button>}<button onClick={unpackReference}>Als unabhängige Knoten auspacken</button><button className="danger" onClick={removeSelection}>Referenzknoten löschen</button></> : <>
+            {selectedGroup ? <><h2>{selectedGroup.name}</h2>{selectedGroup.libraryReference && <p>Referenz · v{selectedGroup.libraryReference.version}</p>}<p className="hint">{selectedGroup.nodes.length} gespeicherte Knoten · {selectedGroup.outputs.length} typisierte Ausgänge</p>{selectedGroup.outputs.length>1 && <label>Vorschauausgang<select aria-label="Vorschauausgang" value={current?.node.id || ''} onChange={e=>setGroupPreview(value=>({...value,[selectedGroup.id]:e.target.value}))}>{selectedGroup.outputs.map(output=><option key={output.id} value={output.id}>{output.name} · {output.type}</option>)}</select></label>}{selectedGroup.ports.map(port=><Field key={port.id} label={port.name || portName({...port,id:port.targetPort},entries.find(e=>e.node.id===port.targetNode).node)} value={port.source} options={[[ '', 'Offen' ],...entries.filter(entry=>!selectedGroup.nodes.includes(entry.node.id) && acceptsValue(port,entry)).map(entry=>[entry.node.id,entry.node.name || names[entry.node.kind]])]} onChange={source=>{if(source) connectView({source,target:selectedGroup.id,targetHandle:port.id});else transact(()=>{const targets=port.targets || [{target:port.targetNode,port:port.targetPort}];commit(applyWires(mode,document,entries,wires.filter(wire=>!targets.some(target=>target.target===wire.target && target.port===wire.port))))})}}/>)}{selectedGroup.libraryReference && <button onClick={()=>{setReferenceTarget(selectedGroup.id);setReferenceDialog(true)}}>Referenz auswählen …</button>}<button onClick={unpackReference}>Als unabhängige Knoten auspacken</button></> : <>
             <a className="reference-link" href={`${wiki}/Knoten-${mode === 'form' ? 'Formgraph' : 'Gebaeudegraph'}#${visibleNode.node.kind.toLowerCase()}`}>Knotenreferenz ↗</a>
-            <h2>{visibleNode.node.name || names[visibleNode.node.kind]}</h2>
+            <h2>{visibleNode.node.name || operatorFamily(mode,visibleNode.node.kind)?.label || names[visibleNode.node.kind]}</h2>
+
             <div className="node-id">{visibleNode.node.id} · Ausgang: {visibleNode.outputType || 'Ergebnis'}</div>
             {visibleNode.ports.length > 0 && <details open><summary>Verbindungen</summary>
               {visibleNode.ports.map(port => <Field key={port.id} label={portName(port, visibleNode.node)}
-                value={port.source} options={[[ '', 'Offen' ], ...entries.filter(({ node }) =>
-                  port.accepts.includes(node.kind) && node.id !== visibleNode.node.id)
+                value={port.source} options={[[ '', 'Offen' ], ...entries.filter(entry =>
+                  acceptsValue(port,entry) && entry.node.id !== visibleNode.node.id)
                   .map(({ node }) => [node.id, node.name || `${names[node.kind]} · ${node.id}`])]}
                 onChange={source => setWire(visibleNode.node.id, port.id, source)} />)}
-              {portLimits && portLimits.min !== portLimits.max && !['POSITION','MIRROR'].includes(visibleNode.node.kind) && <div className="button-row">
-                <button type="button" disabled={visibleNode.node.inputs.length >= portLimits.max}
-                  onClick={() => patchNode({ inputs: [...visibleNode.node.inputs, ''] })}>+ Eingang</button>
-                <button type="button" disabled={visibleNode.node.inputs.length <= portLimits.min}
-                  onClick={() => patchNode({ inputs: visibleNode.node.inputs.slice(0, -1),
-                    ...(mode === 'form' ? { inputGroups: visibleNode.node.inputGroups.slice(0, visibleNode.node.inputs.length - 1) } : {})
-                  })}>Letzten Eingang entfernen</button>
-              </div>}
             </details>}
             <NodeFields {...{ mode, node: visibleNode.node, document, edit: patchNode, library }}
               onInspectNode={id => { setSelected(id); setSelectedIds([id]); setSelectedWire(null) }}
               onChooseCopycat={() => chooseCopycat(visibleNode.node.id)}
               onImportCopycat={() => copycatInput.current.click()} />
-            {(selectedWire || current && !protectedNode(current.node,document)) &&
-              <button className="danger" type="button" onClick={removeSelection}>{selectedWire ? 'Verbindung trennen' : 'Knoten löschen'}</button>}
-            {visibleNode && !visibleNode.node.resultType && (visibleNode.outputType === 'shape' || visibleNode.outputType?.startsWith('COPYCAT') || ['ROTATION','MIRRORING','POSITION'].includes(visibleNode.node.kind)) && <CopycatTransforms node={visibleNode.node} edit={patchNode} primary />}
+
+            {visibleNode && !visibleNode.node.resultType && (visibleNode.outputType === 'shape' || visibleNode.outputType?.startsWith('COPYCAT') || ['ROTATION','POSITION'].includes(visibleNode.node.kind)) && <CopycatTransforms node={visibleNode.node} edit={patchNode} primary />}
             {!visibleNode.node.resultType && visibleNode.outputType?.toLowerCase()==='position' && <button onClick={splitPosition}>In X/Y/Z zerlegen</button>}
             <NativeDocumentFields {...{ mode, document }} selection={memberIds} edit={next => transact(() => commit(next))} />
             <DocumentFields {...{ mode, document, library, materials, setMaterials }} edit={next => transact(() => commit(next))} />
             </>}</fieldset></>}
           </div>
         </section>
-      </div>
+      </SidePanels>
     </div>
-    {copycatPicker && <Suspense fallback={<p className="copycat-loading" role="status">Copycat-Auswahl wird geladen …</p>}>
+    {copycatPicker && <SelectionBoundary onClose={()=>{pickerOrigin.current=null;setCopycatPicker(null)}}>
       <CopycatPicker {...copycatPicker} mode={mode} savedForms={savedForms} library={library}
-        onChoose={applyCopycat} onClose={() => setCopycatPicker(null)} />
-    </Suspense>}
+        onChoose={applyCopycat} onClose={()=>{pickerOrigin.current=null;setCopycatPicker(null)}} />
+    </SelectionBoundary>}
   </div>
 }
 

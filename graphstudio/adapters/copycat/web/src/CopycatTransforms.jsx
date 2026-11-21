@@ -14,10 +14,9 @@ export function CopycatTransforms({ node, edit, primary = false }) {
   const move = (index, delta) => { const next = [...steps]; next.splice(index + delta, 0, next.splice(index, 1)[0]); setSteps(next) }
   return <details className="transform-list" open><summary>Copycat-Transformationen</summary>
     <p className="hint">Nach der Knotenauswertung · Reihenfolge über alle Abschnitte · hB = 1/16 Block</p>
-    {primary && ['ROTATE','ROTATION','COPYCAT_ROTATE','MIRRORING','POSITION','TRANSLATE','COPYCAT_POSITION'].includes(node.kind) && <fieldset><legend>Operator / Parameterwert</legend>
+    {primary && ['ROTATE','ROTATION','COPYCAT_ROTATE','POSITION','TRANSLATE','COPYCAT_POSITION'].includes(node.kind) && <fieldset><legend>Operator / Parameterwert</legend>
       {['ROTATE','ROTATION','COPYCAT_ROTATE'].includes(node.kind) && point(node.rotationPivot || { x:8,y:8,z:8 }, value => edit({ rotationPivot:value }), 'Drehpunkt (hB)', 0,16)}
       {['POSITION','TRANSLATE','COPYCAT_POSITION'].includes(node.kind) && point(node.translation, value => edit({ translation:value }), 'Position (hB)', 0,node.kind === 'POSITION' ? 2147483647 : 16)}
-      {node.kind === 'MIRRORING' && <MirrorPlanePicker value={node.mirror?.plane || 'X'} onChange={plane=>edit({mirror:{plane}})}/>}
     </fieldset>}
     {!['ROTATION','MIRRORING','POSITION'].includes(node.kind) && <>
     {Object.entries(labels).map(([kind, label]) => <fieldset key={kind}><legend>{label}</legend>

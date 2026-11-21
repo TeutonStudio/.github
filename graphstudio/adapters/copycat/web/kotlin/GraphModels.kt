@@ -34,7 +34,7 @@ internal object GraphModels {
         return value
     }
     fun newShape(kind:NodeKind):GraphNode = decodeGraphNode(defaults(catalog.copycat,kind.name,catalog.copycat.nodes[kind.name].defaults))
-        .copy(inputs=List(if(kind==NodeKind.MIRROR) 2 else if(kind==NodeKind.POSITION) 3 else inputs(kind).first) { "" })
+        .copy(inputs=List(if(kind in setOf(NodeKind.MIRROR,NodeKind.UNION,NodeKind.INTERSECTION,NodeKind.BOOLEAN_LOGIC)) 2 else if(kind==NodeKind.POSITION) 3 else inputs(kind).first) { "" })
     fun newBuilding(kind:BuildingKind,explicit:Boolean):BuildingNode {
         val model=catalog.building.nodes[kind.name]
         return decodeBuildingNode(defaults(catalog.building,kind.name,if(explicit || model.alwaysExplicit==true) model.defaults else model.legacyDefaults))
@@ -67,6 +67,9 @@ internal object GraphModels {
         val nodes=names(value.nodes).associateWith { NodeModel(value.nodes[it]) }
     }
     class NodeModel(value:dynamic) {
+        val algebraAvailable=value.commutativeAssociative!=null || value.commutative!=null && value.associative!=null
+        // Older pinned catalogs expose the two mathematical flags separately.
+        val commutativeAssociative=if(value.commutativeAssociative!=null) value.commutativeAssociative==true else value.commutative==true && value.associative==true
         val output=value.output?.unsafeCast<String>()
         val inputs=if(value.inputs==null) null else ShapeInputs(value.inputs)
         val ports=list(value.ports).map(::BuildingPortModel)
