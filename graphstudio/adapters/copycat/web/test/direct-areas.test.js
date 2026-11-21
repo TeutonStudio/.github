@@ -4,6 +4,7 @@ import {readFileSync} from 'node:fs'
 import {newNode,previewGraph,arrangementGraph,starterBuilding,authoringBuildingNode,remapBuildingReferences,graphModels} from '../src/generated/engine.mjs'
 import {applyWires,connections,editNode,inspect,readGraph,replaceNodes,writeGraph,editInputs} from '../src/model.js'
 import {switchOperator} from '../src/operator-families.js'
+import {newCard} from '../src/cards.js'
 import {changeOperator} from '../src/operators.js'
 const test=(name,run)=>nodeTest(name,{skip:!graphModels().directAreas},run)
 const fixture=name=>JSON.parse(readFileSync(new URL(`../../examples/${name}.json`,import.meta.url)))
@@ -143,4 +144,33 @@ for(const [operation,count] of [['UNION',8],['INTERSECTION',2],['DIFFERENCE',4],
  const unary=changeOperator('building',d,'op','ROTATE')
  assert.equal(unary.graph.nodes.find(n=>n.id==='op').operandOffsets,null)
  assert.equal(arrangementGraph(unary,library,'op','Y').editable,false)
+})
+
+
+test('first drawn room-area wire upgrades the graph before validation and survives reopening',()=>{
+ for(const area of [
+  {...n('AREA','area'),areaMode:'SQUARE',length:4},
+  {...n('AREA','area'),areaMode:'RECTANGLE',length:2,height:4},
+  {...n('AREA','area'),areaMode:'DRAW',coordinates:[{x:0,y:0,z:0},{x:1,y:0,z:0},{x:0,y:0,z:1}]},
+ ]) {
+  const room={...n('ROOM','room'),height:5,floor:'room_floor',ceiling:'room_ceiling'}
+  let d=newCard()
+  d=replaceNodes(d,[...d.graph.nodes,area,room,{...n('FLOOR','room_floor'),assembly:false,inputs:['source']},{...n('CEILING','room_ceiling'),assembly:false,inputs:['source']}])
+  const entries=inspect('building',d),port=entries.find(e=>e.node.id==='room').ports.find(p=>p.id==='geometry')
+  assert.equal(d.graph.schema,8)
+  assert.ok(port.accepts.includes('AREA'))
+  const connected=applyWires('building',d,entries,[...connections(entries),{source:'area',target:'room',port:'geometry'}])
+  assert.equal(connected.graph.schema,11)
+  assert.equal(connected.graph.nodes.find(n=>n.id==='room').geometry,'area')
+  const preview=plan(connected,'room')
+  assert.ok(preview.count>0)
+  const round=readGraph(JSON.parse(JSON.stringify(writeGraph('building',connected))),'building')
+  assert.deepEqual(plan(round,'room'),preview)
+  const resized=editNode('building',connected,{...connected.graph.nodes.find(n=>n.id==='area'),areaMode:'RECTANGLE',length:2,height:5})
+  assert.equal(inspect('building',resized).find(e=>e.node.id==='room').node.height,5)
+  assert.notDeepEqual(plan(resized,'room'),preview)
+  const rewired=applyWires('building',connected,inspect('building',connected),connections(inspect('building',connected)).filter(w=>w.target!=='room'||w.port!=='geometry'))
+  assert.equal(rewired.graph.nodes.find(n=>n.id==='room').geometry,'')
+  assert.equal(d.graph.nodes.find(n=>n.id==='room').geometry,'')
+ }
 })
