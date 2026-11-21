@@ -19,7 +19,6 @@ export function nodeControls(mode,node) {
  if(node.kind==='SEGMENT' && node.id!=='empty_wall') {
   const axes=(node.dynamicAxes||[]).join('')
   pick('dynamicAxes','Dynamische Achsen',axes,[['','Feste Maße'],...['X','Y','Z','XY','XZ','YZ','XYZ'].map(v=>[v,[...v].join(' / ')])])
-  for(const [field,axis]of [['length','X'],['height','Y'],['depth','Z']])number(field,axisLabel(axis)+(axes.includes(axis)?' · Vorschau':''),node[field]??1,1,128)
  }
  if(node.kind==='ROOM')pick('roomConfig.mode','Raumaufbau',node.roomConfig?.mode||'FOOTPRINT',[['FOOTPRINT','Fläche und Wände'],['SEGMENTS','Segmente']])
  if(node.kind==='STOREY')pick('storeyMode','Geschossaufbau',node.storeyMode||'rooms',[['rooms','Räume'],['walls','Wände']])
