@@ -1,3 +1,4 @@
+import {axisLabel} from './axis-labels.js'
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { arrangementGraph, previewGraph } from './generated/engine.mjs'
 import { arrangementPath, fitArrangement, moveArrangement } from './arrangement.js'
@@ -7,8 +8,7 @@ const colors = ['#55b8d0', '#d69b62', '#90be78', '#ba8dcc', '#da7980', '#799ee0'
 
 export function ArrangementGrid({ node, document, library, edit, standalone=false, readOnly=false, onPreview }) {
   const pattern = node.kind === 'PATTERN'
-  const booleans = ['SEGMENT_UNION','SEGMENT_INTERSECTION','SEGMENT_DIFFERENCE','SEGMENT_SYMMETRIC_DIFFERENCE'].includes(node.kind) || node.kind==='SEGMENT_OPERATOR' && ['UNION','INTERSECTION','DIFFERENCE','SYMMETRIC_DIFFERENCE'].includes(node.operation || 'UNION')
-  const difference=node.kind==='SEGMENT_DIFFERENCE' || node.kind==='SEGMENT_OPERATOR' && node.operation==='DIFFERENCE'
+  const booleans = ['SEGMENT_UNION','SEGMENT_INTERSECTION','SEGMENT_DIFFERENCE','SEGMENT_SYMMETRIC_DIFFERENCE'].includes(node.kind)
   const segments = pattern || node.kind.startsWith('SEGMENT_')
   const [plane, setPlane] = useState(segments ? 'Z' : 'Y')
   const [patch, setPatch] = useState(null)
@@ -72,7 +72,7 @@ export function ArrangementGrid({ node, document, library, edit, standalone=fals
           cancelDrag(); setPlane(event.target.value); setViewport(null)
         }}><option value="Z">Vorne · X/Y</option><option value="Y">Oben · X/Z</option><option value="X">Seite · Z/Y</option></select></label>}
         <label>Eingang<select aria-label="Anordnungseingang" value={active} onChange={event => setSelected(Number(event.target.value))}>
-          {items.map((item, i) => <option key={i} value={i}>{difference ? ['A','B'][i] : i + 1}. {item.label}</option>)}
+          {items.map((item, i) => <option key={i} value={i}>{node.kind==='SEGMENT_DIFFERENCE' ? ['A','B'][i] : i + 1}. {item.label}</option>)}
         </select></label>
       </div>
       <p className="hint">Gemeinsamer Ursprung: X 0 · Y 0 · Z 0. 1 Rasterzelle = 1 Block = 16 hB. Ziehen verschiebt den gewählten Eingang; Pfeiltasten bewegen ihn um einen Block. Mittlere Maustaste verschiebt die Ansicht. Escape verwirft eine laufende Bewegung.</p>
@@ -82,7 +82,7 @@ export function ArrangementGrid({ node, document, library, edit, standalone=fals
         {current.model?.pending && <p>{current.model.pending}</p>}
         {conflicts.map((conflict,i) => <p key={i}>{conflictMessage(conflict)}</p>)}
       </div>}
-      <ul className="arrangement-legend">{items.map((item,i)=><li key={i}><span style={{background:colors[i%colors.length]}}/>{difference?['A','B'][i]:i+1}. {item.label}{item.error && <small>{item.error}</small>}</li>)}</ul>
+      <ul className="arrangement-legend">{items.map((item,i)=><li key={i}><span style={{background:colors[i%colors.length]}}/>{node.kind==='SEGMENT_DIFFERENCE'?['A','B'][i]:i+1}. {item.label}{item.error && <small>{item.error}</small>}</li>)}</ul>
       <svg ref={svg} className="arrangement-grid" viewBox={bounds.join(' ')} tabIndex={0}
         role="application" aria-label="2D-Anordnungsraster" onContextMenu={event => event.preventDefault()}
         onPointerDown={event => {
@@ -145,14 +145,14 @@ export function ArrangementGrid({ node, document, library, edit, standalone=fals
         <button type="button" aria-label="Verkleinern" title="Verkleinern" onClick={() => zoom(4 / 3)}>−</button>
         <button type="button" aria-label="Raster einpassen" title="Einpassen" onClick={() => setViewport(fitArrangement(items))}>⤢</button></div>
       {offset && <div className="arrangement-tools arrangement-position"><fieldset disabled={!editable} className="arrangement-coordinates">
-        {(segments ? ['x', 'y', 'z'] : ['x', 'z']).map(axis => <label key={axis}>{axis.toUpperCase()} · Blöcke
+        {(segments ? ['x', 'y', 'z'] : ['x', 'z']).map(axis => <label key={axis}>{axisLabel(axis.toUpperCase())} · Blöcke
           <input aria-label={`Anordnung ${axis.toUpperCase()}`} type="number" min={pattern ? -128 : -64} max={pattern ? 128 : 64}
             value={offset[axis]} onChange={event => {
               const value = event.target.valueAsNumber
               if (Number.isInteger(value) && Math.abs(value) <= (pattern ? 128 : 64)) stage(active, { ...offset, [axis]: value })
             }} /></label>)}
         {pattern && <><label>Drehachse<select aria-label="Anordnung Drehachse" value={transforms[active]?.axis} onChange={event => stage(active, offset, { axis: event.target.value })}>
-          {['X', 'Y', 'Z'].map(axis => <option key={axis}>{axis}</option>)}</select></label>
+          {['X', 'Y', 'Z'].map(axis => <option key={axis} value={axis}>{axisLabel(axis)}</option>)}</select></label>
           <label>Drehwinkel<select aria-label="Anordnung Drehwinkel" value={transforms[active]?.quarterTurns} onChange={event => stage(active, offset, { quarterTurns: Number(event.target.value) })}>
             {[0, 1, 2, 3].map(q => <option key={q} value={q}>{q * 90}°</option>)}</select></label></>}
       </fieldset></div>}
@@ -164,7 +164,8 @@ export function ArrangementGrid({ node, document, library, edit, standalone=fals
 }
 
 export function ArrangementPanel({collapsed,onToggle,...props}) {
-  return <section className="arrangement-panel preview-panel" aria-label="2D-Segmentanordnung"><div className="panel-heading"><span>2D-Anordnung · Segmente</span><button type="button" aria-expanded={!collapsed} aria-label={collapsed?'2D-Anordnung ausklappen':'2D-Anordnung einklappen'} onClick={onToggle}>{collapsed?'▸':'▾'}</button></div>
-    {!collapsed && <ArrangementGrid {...props} standalone/>}
+  const storey=props.node.kind==='STOREY'
+  return <section className="arrangement-panel preview-panel" aria-label={storey?'2D-Raumanordnung':'2D-Segmentanordnung'}><div className="panel-heading"><span>2D-Anordnung · {storey?'Räume':'Segmente'}</span><button type="button" aria-expanded={!collapsed} aria-label={collapsed?'2D-Anordnung ausklappen':'2D-Anordnung einklappen'} onClick={onToggle}>{collapsed?'▸':'▾'}</button></div>
+    {!collapsed && (storey&&props.node.storeyMode!=='rooms'?<p className="hint">Für die relative Raumanordnung am Geschossknoten den Aufbau „Räume“ wählen und Räume anschließen.</p>:<ArrangementGrid {...props} standalone/>)}
   </section>
 }

@@ -5,9 +5,12 @@
   "type": "module",
   "engines": { "node": ">=22.12.0" },
   "scripts": {
-    "test": "node --test test/*.test.mjs",
+    "test": "node --test --experimental-test-isolation=none test/*.test.mjs alpha/test/project.test.mjs",
     "build": "node scripts/build.mjs",
     "internal": "node scripts/internal.mjs",
-    "preview": "node scripts/serve.mjs"
+    "preview": "node scripts/serve.mjs",
+    "alpha": "node scripts/alpha.mjs",
+    "test:alpha": "node --test --experimental-test-isolation=none alpha/test/*.test.mjs",
+    "preview:alpha": "node scripts/serve-alpha.mjs"
   }
 }

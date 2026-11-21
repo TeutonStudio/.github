@@ -1,3 +1,4 @@
+import {axisLabel} from './axis-labels.js'
 import { previewCopycatOption } from './copycat-options.js'
 import { newNode,previewGraph,remapBuildingReferences,compileForm,normalizeDocument,wireModels } from './generated/engine.mjs'
 import { applyWires,connections,inspect,model,position,replaceNodes } from './model.js'
@@ -53,10 +54,10 @@ export function moveViewNodes(document,groups,moved) {
 }
 function reference(entry) {return {documentId:identityOf(entry),version:entry.version || 1,name:entry.name,collection:entry.collection || 'graphs'}}
 function scopeLibrary(entry,namespace,currentLibrary) {
-  const scalarTypes=new Set(['INT','POSITION','ROTATION','MIRRORING','BOOLEAN','TRANSFORMATION'])
+  const scalarTypes=new Set(['INT','COUNT','POSITION','ROTATION','MIRRORING','BOOLEAN','TRANSFORMATION'])
   const result=entry.document?.graph?.nodes.find(node=>node.resultType)
   const scalar=entry.collection==='nodeGroups'
-    ? entry.graphInterface?.outputs?.length ? entry.graphInterface.outputs.every(output=>scalarTypes.has(output.type)) : entry.nodes?.length && entry.nodes.every(node=>/^(INT|POSITION|NUMBER_OPERATOR|RELATION_OPERATOR|STATEMENT_OPERATOR)(_|$)/.test(node.kind) || ['ROTATION','MIRRORING','TRANSFORMATION'].includes(node.kind))
+    ? entry.graphInterface?.outputs?.length ? entry.graphInterface.outputs.every(output=>scalarTypes.has(output.type)) : entry.nodes?.length && entry.nodes.every(node=>/^(COUNT|BOOLEAN|INT|POSITION|NUMBER_OPERATOR|RELATION_OPERATOR|STATEMENT_OPERATOR)(_|$)/.test(node.kind) || ['ROTATION','MIRRORING','TRANSFORMATION'].includes(node.kind))
     : scalarTypes.has(result?.resultType)
   const source=entry.library || {},palette=scalar?{}:entry.document?.palette || entry.palette || wireModels().Building.default.palette,roles=Object.fromEntries(Object.keys(palette).map(key=>[key,`${namespace}_${key}`]))
   const formIds=Object.fromEntries(Object.keys(source.forms || {}).map(key=>[key,`${namespace}_${key}`])),moduleIds=Object.fromEntries(Object.keys(source.modules || {}).map(key=>[key,`${namespace}_${key}`]))
@@ -180,7 +181,7 @@ export function splitVector(mode,document,nodeId,origin={x:40,y:40}) {
   const source=document.graph.nodes.find(n=>n.id===nodeId),ids=['X','Y','Z'].map(axis=>fresh(`vector_${axis}`)),groupId=fresh('vector_split')
   const nodes=ids.map((id,i)=>({...newNode(mode==='building',`POSITION_${'XYZ'[i]}`,id,position(source?source.x+260:origin.x),position((source?.y ?? origin.y)+i*110),true),inputs:[nodeId || '']}))
   const vectorType=mode==='building'?'POSITION':'position',inputPort=mode==='building'?'in:0':'0'
-  const group={id:groupId,name:'Position zerlegen',nodes:ids,presentation:'vectorSplit',graphInterface:{inputs:[{id:'vector',name:'Position · Vektor3',type:vectorType,targets:ids.map((_,member)=>({member,port:inputPort}))}],outputs:ids.map((_,member)=>({id:'XYZ'[member],name:'XYZ'[member],type:'INT',member}))},inputConnections:nodeId?{vector:nodeId}:{}}
+  const group={id:groupId,name:'Position zerlegen',nodes:ids,presentation:'vectorSplit',graphInterface:{inputs:[{id:'vector',name:'Position · Vektor3',type:vectorType,targets:ids.map((_,member)=>({member,port:inputPort}))}],outputs:ids.map((_,member)=>({id:'XYZ'[member],name:axisLabel('XYZ'[member]),type:'INT',member}))},inputConnections:nodeId?{vector:nodeId}:{}}
   const candidate={...document,graph:{...document.graph,nodes:[...document.graph.nodes,...nodes],nodeGroups:[...(document.graph.nodeGroups || []),group]}}
   return {document:replaceNodes(candidate,candidate.graph.nodes),nodeId:groupId}
 }

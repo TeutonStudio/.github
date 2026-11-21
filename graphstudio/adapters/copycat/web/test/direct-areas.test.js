@@ -1,11 +1,9 @@
 import nodeTest from 'node:test'
 import assert from 'node:assert/strict'
 import {readFileSync} from 'node:fs'
-import {newNode,previewGraph,arrangementGraph,starterBuilding,authoringBuildingNode,remapBuildingReferences,graphModels} from '../src/generated/engine.mjs'
+import {newNode,describeNode,previewGraph,arrangementGraph,starterBuilding,authoringBuildingNode,remapBuildingReferences,graphModels} from '../src/generated/engine.mjs'
 import {applyWires,connections,editNode,inspect,readGraph,replaceNodes,writeGraph,editInputs} from '../src/model.js'
 import {switchOperator} from '../src/operator-families.js'
-import {newCard} from '../src/cards.js'
-import {changeOperator} from '../src/operators.js'
 const test=(name,run)=>nodeTest(name,{skip:!graphModels().directAreas},run)
 const fixture=name=>JSON.parse(readFileSync(new URL(`../../examples/${name}.json`,import.meta.url)))
 const library=fixture('library'),base=()=>fixture('building-graph-assembly')
@@ -101,7 +99,7 @@ test('old ignored non-union offsets stay ignored and native authoring selects th
  assert.deepEqual(arrangementGraph(d,library,'op','Y').items.map(i=>i.offset),[{x:0,y:0,z:0},{x:0,y:0,z:0}])
  const starter=starterBuilding();assert.equal(starter.graph.schema,11)
  assert.ok(starter.graph.nodes.every(n=>!['SEGMENT_LAYOUT','ROOM_GEOMETRY','ROOF_LEVEL','ROOF_LAYOUT'].includes(n.kind)))
- const roof=authoringBuildingNode(n('ROOF','roof_new'));assert.equal(roof.roofSections.length,1)
+ const roof=authoringBuildingNode(n('ROOF','roof_new'));assert.equal(roof.roofInputMode,'TEMPLATE');assert.deepEqual(describeNode(true,{...starter,graph:{...starter.graph,nodes:[...starter.graph.nodes,roof]}},roof.id).ports.map(p=>p.id),['geometry','roofTemplate'])
 })
 
 test('multiple embedded roof areas retain individual storey bindings and stable ports after reordering',()=>{
@@ -128,49 +126,4 @@ test('switching a legacy union with vertical positions retains those positions i
  assert.deepEqual(next.graph.nodes.find(n=>n.id==='op').operandOffsets,op.offsets)
  assert.deepEqual(next.graph.nodes.find(n=>n.id==='op').offsets,[])
  assert.equal(plan(next,'op').count,1)
-})
-
-for(const [operation,count] of [['UNION',8],['INTERSECTION',2],['DIFFERENCE',4],['SYMMETRIC_DIFFERENCE',6]]) test(`published ${operation} family shares the relative operand raster`,()=>{
- const a={...n('SEGMENT','a'),assembly:false,module:'',form:'full@1',length:3,height:2,depth:1}
- const b={...a,id:'b',length:2}
- const op={...n('SEGMENT_OPERATOR','op'),operation,inputs:['a','b'],operandOffsets:[{x:-3,y:-2,z:1},{x:-1,y:-2,z:1}]}
- const d=documentWith(a,b,op)
- assert.equal(plan(d,'op').count,count)
- const grid=arrangementGraph(d,library,'op','Y');assert.equal(grid.editable,true)
- assert.deepEqual(grid.items.map(i=>i.offset),op.operandOffsets)
- const switched=changeOperator('building',d,'op','DIFFERENCE')
- assert.deepEqual(switched.graph.nodes.find(n=>n.id==='op').operandOffsets,op.operandOffsets)
- if(operation!=='DIFFERENCE') assert.deepEqual(editInputs('building',d,'op',[1,0]).graph.nodes.find(n=>n.id==='op').operandOffsets,[op.operandOffsets[1],op.operandOffsets[0]])
- const unary=changeOperator('building',d,'op','ROTATE')
- assert.equal(unary.graph.nodes.find(n=>n.id==='op').operandOffsets,null)
- assert.equal(arrangementGraph(unary,library,'op','Y').editable,false)
-})
-
-
-test('first drawn room-area wire upgrades the graph before validation and survives reopening',()=>{
- for(const area of [
-  {...n('AREA','area'),areaMode:'SQUARE',length:4},
-  {...n('AREA','area'),areaMode:'RECTANGLE',length:2,height:4},
-  {...n('AREA','area'),areaMode:'DRAW',coordinates:[{x:0,y:0,z:0},{x:1,y:0,z:0},{x:0,y:0,z:1}]},
- ]) {
-  const room={...n('ROOM','room'),height:5,floor:'room_floor',ceiling:'room_ceiling'}
-  let d=newCard()
-  d=replaceNodes(d,[...d.graph.nodes,area,room,{...n('FLOOR','room_floor'),assembly:false,inputs:['source']},{...n('CEILING','room_ceiling'),assembly:false,inputs:['source']}])
-  const entries=inspect('building',d),port=entries.find(e=>e.node.id==='room').ports.find(p=>p.id==='geometry')
-  assert.equal(d.graph.schema,8)
-  assert.ok(port.accepts.includes('AREA'))
-  const connected=applyWires('building',d,entries,[...connections(entries),{source:'area',target:'room',port:'geometry'}])
-  assert.equal(connected.graph.schema,11)
-  assert.equal(connected.graph.nodes.find(n=>n.id==='room').geometry,'area')
-  const preview=plan(connected,'room')
-  assert.ok(preview.count>0)
-  const round=readGraph(JSON.parse(JSON.stringify(writeGraph('building',connected))),'building')
-  assert.deepEqual(plan(round,'room'),preview)
-  const resized=editNode('building',connected,{...connected.graph.nodes.find(n=>n.id==='area'),areaMode:'RECTANGLE',length:2,height:5})
-  assert.equal(inspect('building',resized).find(e=>e.node.id==='room').node.height,5)
-  assert.notDeepEqual(plan(resized,'room'),preview)
-  const rewired=applyWires('building',connected,inspect('building',connected),connections(inspect('building',connected)).filter(w=>w.target!=='room'||w.port!=='geometry'))
-  assert.equal(rewired.graph.nodes.find(n=>n.id==='room').geometry,'')
-  assert.equal(d.graph.nodes.find(n=>n.id==='room').geometry,'')
- }
 })

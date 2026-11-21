@@ -64,7 +64,7 @@ test('whole-card and node-group replacements keep the visible anchor and relativ
       assert.deepEqual(view.position,{x:-900,y:340})
       assert.deepEqual(view.members.map(({node})=>[node.x+900,node.y-340]),[[0,0],[240,150],[510,35]])
       assert.equal(result.document.graph.nodes.find(node=>node.resultType).inputs[0],view.outputs[0].id)
-      assert.equal(previewGraph(true,result.document,result.library,view.outputs[0].id).value,'Anzahl: 5')
+      assert.equal(previewGraph(true,result.document,result.library,view.outputs[0].id).value,'Ganzzahl: 5')
       document=result.document;targetId=view.id
     }
     const result=insertSavedReference({mode:'building',document,library,materials:{},entry:formEntry(),targetId})

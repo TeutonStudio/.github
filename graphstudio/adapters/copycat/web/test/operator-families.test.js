@@ -9,6 +9,29 @@ const doc=(b,nodes)=>({schema:b?2:3,palette:{wall:'minecraft:stone'},graph:{sche
 test('each geometry family includes Transformieren and switches without losing compatible operands or output wires',()=>{
  for(const b of [false,true]) for(const family of operatorFamilies(b?'building':'form')) {
   const mode=b?'building':'form',segment=family.id==='segments'
+  if(family.id==='numbers') {
+   for(const [kind] of family.operations) {
+    const scalar=n(b,'COUNT','number',{countValue:2}),op=n(b,kind,'op');op.inputs=op.inputs.map(()=>'number')
+    const d=doc(b,[scalar,op]);d.graph.schema=b?13:9
+    const result=d.graph.nodes.find(n=>n.id==='result');result.inputs=b?['op']:[''];if(b)result.resultType='INT'
+    const e=inspect(mode,d).find(e=>e.node.id==='op')
+    assert.equal(e.outputType,kind==='INT_SUBTRACT'?'INT':'COUNT')
+   }
+   continue
+  }
+  if(family.id==='positions') {
+   const kinds=family.operations.map(([kind])=>kind)
+   for(const kind of kinds) {
+    const value=n(b,'POSITION','source'),op=n(b,kind,'op')
+    const d=doc(b,[value,op]);if(b)d.graph.nodes.find(n=>n.id==='result').inputs=['source'],d.graph.nodes.find(n=>n.id==='result').resultType='POSITION'
+    if(!b)d.graph.nodes.find(n=>n.id==='result').inputs=['']
+    const entry=inspect(mode,d).find(e=>e.node.id==='op')
+    assert.equal(entry.outputType,kind==='POSITION_X'?'INT':b?'POSITION':'position')
+    assert.ok(entry.ports.length>=1)
+   }
+   continue
+  }
+
   const source=segment?n(true,'SEGMENT','source'):n(b,b?'COPYCAT':'INPUT','source')
   const [union]=family.operations[0],transform=family.operations.find(([kind])=>kind.endsWith('_TRANSFORM'))[0]
   const d=doc(b,[source,n(b,union,'op',{inputs:['source',''],name:'Meine Operation'})])
@@ -18,6 +41,13 @@ test('each geometry family includes Transformieren and switches without losing c
   assert.ok(connections(inspect(mode,next)).some(w=>w.source==='source' && w.target==='op'))
   assert.ok(connections(inspect(mode,next)).some(w=>w.source==='op' && w.target==='result'))
   for(const [kind] of family.operations) {
+   if(['ROTATION_SEGMENT','SERVICE_SHAFT_SEGMENT','ELEVATOR_SHAFT_SEGMENT'].includes(kind)) {
+    const generated=switchOperator(mode,next,'op',kind),entry=inspect(mode,generated).find(e=>e.node.id==='op')
+    assert.equal(entry.outputType,'WALL')
+    assert.ok(connections(inspect(mode,generated)).some(w=>w.source==='op'&&w.target==='result'))
+    assert.ok(entry.ports.every(port=>port.types.includes('COPYCAT')||port.types.includes('INT')))
+    continue
+   }
    next=switchOperator(mode,next,'op',kind)
    const entry=inspect(mode,next).find(e=>e.node.id==='op')
    assert.equal(entry.node.kind,kind)
@@ -31,7 +61,8 @@ test('changing operators retains matching parameter types and removes incompatib
   const mode=b?'building':'form',kind=b?'COPYCAT_ROTATE':'ROTATE'
   let d=doc(b,[n(b,b?'COPYCAT':'INPUT','source'),n(b,'ROTATION','rotation'),n(b,kind,'op',b?{inputs:['source'],rotation:'rotation'}:{inputs:['source','rotation']})])
   d=switchOperator(mode,d,'op',b?'COPYCAT_MIRROR':'MIRROR')
-  const entry=inspect(mode,d).find(e=>e.node.id==='op')
+  if(!b)d.graph.nodes.find(n=>n.id==='result').inputs=['']
+    const entry=inspect(mode,d).find(e=>e.node.id==='op')
   assert.equal(entry.ports[0].source,'source');assert.equal(entry.ports[1].source,'')
   assert.throws(()=>switchOperator(mode,d,'op','TRANSFORMATION'),/Operatorfamilie/)
  }

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import {readFileSync} from 'node:fs'
 import {areaGraph,describeNode,newNode,previewGraph} from '../src/generated/engine.mjs'
 import {editNode,writeGraph,readGraph} from '../src/model.js'
-import {areaModePatch,fitArea,paintArea,rasterLine,rasterRectangle} from '../src/area-grid.js'
+import {areaModePatch,fitArea,paintArea,rasterLine} from '../src/area-grid.js'
 const fixture=name=>JSON.parse(readFileSync(new URL(`../../examples/${name}.json`,import.meta.url)))
 const library=fixture('library')
 const base=()=>fixture('building-graph-assembly')
@@ -57,16 +57,6 @@ test('adaptive roof exposes arrangement and all five typed segment slots from th
  const doc=base();doc.graph.schema=7;doc.graph.nodes.push(newNode(true,'ROOF','automatic',0,0,true))
  const ports=describeNode(true,doc,'automatic').ports
  assert.deepEqual(ports.map(p=>p.id),['layout','in:0','in:1','in:2','in:3','in:4'])
- assert.ok(ports.slice(1).every(p=>p.types.every(type=>type==='WALL')))
+ assert.ok(ports.slice(1).every(p=>p.types.every(type=>['WALL','ROOF'].includes(type))))
  assert.equal(doc.graph.nodes.find(n=>n.id==='roof').adaptiveRoof,undefined)
-})
-
-test('dragged rectangle and square masks survive native editing, export and reload',()=>{
- for(const square of [false,true]) {
-  let document=addArea(),area=document.graph.nodes.find(n=>n.id==='area')
-  const coordinates=paintArea([],rasterRectangle({x:-3,z:-1},{x:1,z:1},square),true)
-  document=editNode('building',document,{...area,areaMode:'DRAW',dimensions:null,coordinates})
-  const reloaded=readGraph(writeGraph('building',document),'building')
-  assert.deepEqual(new Set(areaGraph(reloaded,'area').points.map(p=>`${p.x},${p.z}`)),new Set(coordinates.map(p=>`${p.x},${p.z}`)))
- }
 })

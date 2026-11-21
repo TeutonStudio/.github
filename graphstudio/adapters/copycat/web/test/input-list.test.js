@@ -60,7 +60,7 @@ test('segment input offsets follow their source and removal compacts them withou
 })
 
 test('native guard rejects fixed operations, forged instance flags, duplicates and over-limit input changes',()=>{
- for(const kind of ['INT_SUBTRACT','INT_DIVIDE','COPYCAT_DIFFERENCE','POSITION','PATTERN']) {
+ for(const kind of ['POSITION','PATTERN']) {
   const d=building([node(kind,'fixed',{commutativeAssociative:true})])
   assert.throws(()=>editInputs('building',d,'fixed',[1,0]),/commutative and associative/)
  }
@@ -76,9 +76,9 @@ test('all additional integer and position operands participate in native evaluat
  for(const [op,expected] of [['ADD',9],['MULTIPLY',24],['MIN',2],['MAX',4]]) {
   let d=building([node('INT','a',{countValue:2}),node('INT','b',{countValue:3}),node('INT','c',{countValue:4}),node('INT_'+op,'result',{inputs:['a','b','c']})])
   d=editInputs('building',d,'result',[2,0,1])
-  assert.equal(previewGraph(true,d,lib,'result').value,`Anzahl: ${expected}`)
+  assert.equal(previewGraph(true,d,lib,'result').value,`Ganzzahl: ${expected}`)
   const round=readGraph(JSON.parse(JSON.stringify(writeGraph('building',d))),'building')
-  assert.equal(previewGraph(true,round,lib,'result').value,`Anzahl: ${expected}`)
+  assert.equal(previewGraph(true,round,lib,'result').value,`Ganzzahl: ${expected}`)
   const vectors=building([node('POSITION','a',{translation:{x:2,y:2,z:2}}),node('POSITION','b',{translation:{x:3,y:3,z:3}}),node('POSITION','c',{translation:{x:4,y:4,z:4}}),node('POSITION_'+op,'result',{inputs:['a','b','c']})])
   const changed=editInputs('building',vectors,'result',[1,2,0])
   assert.match(previewGraph(true,changed,lib,'result').value,new RegExp(`x=${expected}, y=${expected}, z=${expected}`))
@@ -94,8 +94,8 @@ test('named group ports and all instances retain their own incoming wires after 
  assert.deepEqual(get(moved,'two').inputs,['a','b'])
  for(const group of moved.graph.nodeGroups) assert.deepEqual(group.graphInterface.inputs.map(i=>i.targets[0].port),['in:1','in:0'])
  assert.deepEqual(moved.graph.nodeGroups[1].inputConnections,{left:'b',right:'a'})
- assert.equal(previewGraph(true,moved,lib,'one').value,'Anzahl: 5')
- assert.equal(previewGraph(true,moved,lib,'two').value,'Anzahl: 5')
+ assert.equal(previewGraph(true,moved,lib,'one').value,'Ganzzahl: 5')
+ assert.equal(previewGraph(true,moved,lib,'two').value,'Ganzzahl: 5')
 })
 
 
@@ -105,7 +105,20 @@ test('permutations cannot change overflow through intermediate sums or products'
   for(const order of [[0,1,2],[2,0,1],[1,2,0]]) {
    const changed=editInputs('building',d,'r',order)
    assert.equal(changed.graph.schema,9)
-   assert.equal(previewGraph(true,changed,lib,'r').value,`Anzahl: ${expected}`)
+   assert.equal(previewGraph(true,changed,lib,'r').value,`Ganzzahl: ${expected}`)
   }
  }
+})
+
+test('socket-circle permutations move binary operand wires and named terminals together',async()=>{
+ const {moveInput,inputsReorderable}=await import('../src/input-list.js')
+ const d=building([node('INT','a',{countValue:7}),node('INT','b',{countValue:3}),node('INT_SUBTRACT','op',{inputs:['a','b']})])
+ d.graph.nodeGroups=[{id:'g',name:'Rechnung',nodes:['op'],graphInterface:{inputs:[{id:'left',name:'A',type:'INT',targets:[{member:0,port:'in:0'}]}],outputs:[{id:'out',name:'Zahl',type:'INT',member:0}]},inputConnections:{left:'a'}}]
+ assert.ok(inputsReorderable(d.graph.nodes.find(n=>n.id==='op'),{}))
+ const order=moveInput(2,0,1),changed=editInputs('building',d,'op',order)
+ assert.deepEqual(changed.graph.nodes.find(n=>n.id==='op').inputs,['b','a'])
+ assert.equal(changed.graph.nodeGroups[0].graphInterface.inputs[0].id,'left');assert.equal(changed.graph.nodeGroups[0].graphInterface.inputs[0].targets[0].port,'in:1')
+ assert.equal(changed.graph.nodeGroups[0].inputConnections.left,'a')
+ assert.deepEqual(d.graph.nodes.find(n=>n.id==='op').inputs,['a','b'])
+ assert.deepEqual(moveInput(4,0,3),[1,2,3,0]);assert.throws(()=>moveInput(2,0,2))
 })

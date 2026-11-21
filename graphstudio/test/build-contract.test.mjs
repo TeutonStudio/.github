@@ -47,4 +47,6 @@ test('only public build directory is uploaded by Pages workflow', () => {
   const ignored = readFileSync(join(root, '../.gitignore'), 'utf8')
   assert.ok(ignored.includes('graphstudio/.internal-dist/'))
   assert.ok(ignored.includes('graphstudio/.cache/'))
+  assert.ok(ignored.includes('graphstudio/.alpha-dist/'))
+  assert.ok(!workflow.includes('.alpha-dist'))
 })

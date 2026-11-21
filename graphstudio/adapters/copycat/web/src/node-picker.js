@@ -1,27 +1,31 @@
-import {describeNode,newNode,authoringBuildingNode} from './generated/engine.mjs'
+import {describeNode,newNode,authoringBuildingNode,graphModels} from './generated/engine.mjs'
 import {categoryOfNode,describeCatalogNode,nodeCategories} from './node-catalog.js'
 import {semanticType,portStyle} from './port-styles.js'
 import {operatorFamily} from './operator-families.js'
+import {axisLabel} from './axis-labels.js'
+import {model} from './model.js'
 import {inputListEnabled} from './input-list.js'
 
-export function nodePreview(mode,kind) {
+export function nodePreview(mode,kind,patch={}) {
   const building=mode==='building'
   const draft=newNode(building,kind,'preview',0,0,true)
-  const node=building?authoringBuildingNode(draft):draft
+  const node={...(building?authoringBuildingNode(draft):draft),...structuredClone(patch)}
   const terminals=building
     ? [newNode(true,'SEGMENT','empty_wall',0,0,true),newNode(true,'BUILDING','result',0,0,true)]
     : [newNode(false,'OUTPUT','result',0,0)]
-  return {mode,...describeNode(building,{schema:building?2:3,palette:{wall:'minecraft:stone'},graph:{schema:building?8:5,nodes:[...terminals,node]}},node.id)}
+  const inspected={mode,...describeNode(building,{schema:building?2:3,palette:{wall:'minecraft:stone'},graph:{schema:Math.max(...(building?graphModels().buildingSchemas:graphModels().copycatSchemas)),nodes:[...terminals,node]}},node.id)}
+  if(kind==='POSITION_X')return {...inspected,node:{...inspected.node,kind:'POSITION_X'},outputType:'INT',outputs:['X','Y','Z'].map(axis=>({id:axis,name:axisLabel(axis),type:'INT'}))}
+  return inspected
 }
 
-export function pickerEntries(kinds,mode,labels,properties,operations={}) {
+export function pickerEntries(kinds,mode,labels,properties,operations={},drafts={}) {
   const seen=new Set()
-  return kinds.flatMap(candidate=>{
+  return kinds.filter(kind=>!model.operators?.[kind]).flatMap(candidate=>{
     const family=operatorFamily(mode,candidate)
     if(family && seen.has(family.id)) return []
     if(family) seen.add(family.id)
     const kind=family ? operations[family.id] || family.operations[0][0] : candidate
-    const preview=nodePreview(mode,kind)
+    const preview=nodePreview(mode,kind,drafts[kind])
     return [{kind,family:family?.id,search:family?.operations.map(([kind,label])=>`${kind} ${label}`).join(" "),label:family?.label || labels[kind] || kind,category:categoryOfNode(kind),description:describeCatalogNode(kind),preview,
       output:semanticType(preview.outputType),inputs:preview.ports.length,variable:inputListEnabled(properties[kind]),available:properties[kind]?.available!==false}]
   })

@@ -1,3 +1,4 @@
+import {axisLabel} from '../src/axis-labels.js'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {readFileSync} from 'node:fs'
@@ -32,7 +33,7 @@ test('a vector is composed from integer arithmetic and splits into a single node
   const split=splitVector('form',doc,'vector');doc=split.document
   const rows=inspect('form',doc),views=groupViews(doc,rows),group=views[0]
   assert.equal(group.outputs.length,3)
-  assert.deepEqual(group.outputs.map(o=>o.name),['X','Y','Z'])
+  assert.deepEqual(group.outputs.map(o=>o.name),['X','Y','Z'].map(axisLabel))
   assert.deepEqual(group.outputs.map(o=>o.type),['INT','INT','INT'])
   assert.equal(viewWires(connections(rows),views).filter(w=>w.viewTarget===group.id).length,1)
   assert.match(previewGraph(false,doc,{},group.outputs[0].id).value,/5/)
@@ -45,7 +46,7 @@ test('a vector is composed from integer arithmetic and splits into a single node
 test('all numeric and vector operations evaluate the same typed values',()=>{
   for(const [operation,expected] of [['ADD',8],['SUBTRACT',4],['MULTIPLY',12],['DIVIDE',3],['MIN',2],['MAX',6]]) {
     const doc=replaceNodes(complete(),[...complete().graph.nodes,{...node('INT','a'),countValue:6},{...node('INT','b'),countValue:2},{...node('INT_'+operation,'op'),inputs:['a','b']}])
-    assert.equal(previewGraph(false,doc,{},'op').value,`Anzahl: ${expected}`)
+    assert.equal(previewGraph(false,doc,{},'op').value,`Ganzzahl: ${expected}`)
     const vector=replaceNodes(complete(),[...complete().graph.nodes,{...node('POSITION','a'),translation:{x:6,y:6,z:6}},{...node('POSITION','b'),translation:{x:2,y:2,z:2}},{...node('POSITION_'+operation,'op'),inputs:['a','b']}])
     assert.match(previewGraph(false,vector,{},'op').value,new RegExp(`x=${expected}, y=${expected}, z=${expected}`))
   }
@@ -64,7 +65,7 @@ test('saved node groups become a single typed reference and lock their exact ver
   const inserted=insertSavedReference({mode:'form',document:complete(),library,materials:{},entry})
   const views=groupViews(inserted.document,inspect('form',inserted.document))
   assert.equal(views.length,1);assert.equal(views[0].outputs[0].type,'INT')
-  assert.equal(previewGraph(false,inserted.document,{},views[0].outputs[0].id).value,'Anzahl: 7')
+  assert.equal(previewGraph(false,inserted.document,{},views[0].outputs[0].id).value,'Ganzzahl: 7')
   assert.deepEqual(savedReferences(inserted.document),['integerGroup@2'])
   assert.ok(dependencies({graphs:[],nodeGroups:[],drafts:{form:{document:inserted.document}}},entry).length)
   const exported=writeGraph('form',inserted.document)
@@ -77,7 +78,7 @@ test('form groups are available as typed references inside building graphs',()=>
   const inserted=insertSavedReference({mode:'building',document:building(),library,materials:{},entry})
   const views=groupViews(inserted.document,inspect('building',inserted.document))
   assert.equal(views[0].outputs[0].type,'INT')
-  assert.equal(previewGraph(true,inserted.document,inserted.library,views[0].outputs[0].id).value,'Anzahl: 7')
+  assert.equal(previewGraph(true,inserted.document,inserted.library,views[0].outputs[0].id).value,'Ganzzahl: 7')
 })
 test('library modules can be previewed and referenced as segments',()=>{
   const entry=libraryReferenceEntries(library).find(e=>e.collection==='libraryModules')
@@ -128,7 +129,7 @@ test('saved split groups preserve their named multi-output interface',()=>{
   for(const mode of ['form','building']) {
     const inserted=insertSavedReference({mode,document:mode==='form'?complete():building(),library,materials:{},entry})
     const view=groupViews(inserted.document,inspect(mode,inserted.document))[0]
-    assert.deepEqual(view.outputs.map(o=>o.name),['X','Y','Z'])
+    assert.deepEqual(view.outputs.map(o=>o.name),['X','Y','Z'].map(axisLabel))
     assert.equal(view.ports.length,1)
     assert.equal(view.ports[0].targets.length,3)
   }
@@ -140,6 +141,6 @@ test('duplicating a reference without external connections preserves its interna
   const inserted=insertSavedReference({mode:'form',document:complete(),library,materials:{},entry}),view=groupViews(inserted.document,inspect('form',inserted.document))[0]
   const copy=duplicateNodes('form',inserted.document,view.nodes,view.nodes.map((_,i)=>'copy'+i),false),views=groupViews(copy,inspect('form',copy))
   assert.equal(views.length,2)
-  assert.equal(previewGraph(false,copy,{},views[1].outputs[0].id).value,'Anzahl: 5')
+  assert.equal(previewGraph(false,copy,{},views[1].outputs[0].id).value,'Ganzzahl: 5')
   assert.deepEqual(savedReferences(copy),['sum@2'])
 })

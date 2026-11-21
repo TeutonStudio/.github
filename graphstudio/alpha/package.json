@@ -1,0 +1,16 @@
+{
+  "name": "graphstudio-alpha",
+  "version": "0.2.0-alpha.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "test": "node --test --experimental-test-isolation=none test/*.test.mjs"
+  },
+  "dependencies": {
+    "@xyflow/react": "12.10.0",
+    "react": "19.2.0",
+    "react-dom": "19.2.0"
+  },
+  "devDependencies": { "vite": "7.3.7" }
+}

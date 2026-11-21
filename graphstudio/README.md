@@ -2,6 +2,86 @@
 
 Gemeinsamer Arbeitsplatz für Copycat- und CC-Visual-Graphen.
 
+## Lokale gemeinsame Alpha · 0.2.0-alpha.1
+
+Die neue Alpha liegt vollständig in diesem Organisationsrepo. Sie verwendet
+einen eigenen Build unter `.alpha-dist` und den Vorschauport **4319**. Der
+bisherige Copycat-Editor, sein Repository und dessen Veröffentlichung werden
+durch diese Alpha nicht ersetzt. Die bestehenden öffentlichen und internen
+Buildwege weiter unten bleiben eigenständig.
+
+```sh
+cd graphstudio
+npm test
+npm run test:alpha
+npm run alpha
+npm run preview:alpha
+```
+
+Vorschau: `http://127.0.0.1:4319/`. `npm run alpha` verwendet standardmäßig die
+benachbarte Arbeitskopie `../../CCVisual` sowie den bereits eingerichteten
+Copycat-Fachkern unter `.cache/copycat-development`. Andere Quellpfade:
+
+```sh
+npm run alpha -- --ccvisual /pfad/zu/CCVisual --copycat /pfad/zum/Copycat-Fachkern
+```
+
+Voraussetzungen: Node.js ab 22.12, Java ab 21, aufgelöste CCVisual-Gradle-
+Abhängigkeiten und ein mit dem Organisationsadapter kompatibler Copycat-Kern.
+Der native Helper verwendet die vorhandenen Maven-Artefakte im Gradlecache:
+Kotlin 2.3.0, Cobalt 0.9.9 und Gson 2.11.0 samt Compilerabhängigkeiten. Fehlende
+Abhängigkeiten werden mit genauer Koordinate gemeldet. Beim ersten Browserbuild
+installiert `npm ci` die im Lockfile festgelegten Pakete. Quelltextänderungen
+benötigen anschließend einen neuen Alpha-Build und ein Neuladen der Vorschau.
+
+Die Alpha enthält:
+
+- Gemeinsamen Einstieg für CC Lua, den Copycat-Organisationsadapter und die
+  Pack-API-Bestandsaufnahme. Copycat wird erst beim ersten Öffnen geladen und
+  bleibt danach beim Bereichswechsel erhalten.
+- 90 native beziehungsweise ausgewählte API-Knotentypen. Der noch nicht
+  angebundene Snippet-Knoten bleibt ausgeblendet. Drag/Zoom, typisierte
+  Verbindungen, Inspektor, Suche, Mehrfachauswahl, Duplizieren und Undo/Redo.
+- Wiederverwendbare Funktions- und Zustandsgruppen mit stabilen Schnittstellen,
+  mehreren Instanzen, verschachtelten Aufrufen und eigenem `state` je Instanz.
+  Die Definition wird einmal erzeugt; Instanzen behalten getrennten Zustand.
+- Automatisches Gruppieren für eine Auswahl mit genau einem Ablaufeingang und
+  höchstens einem Ausgang. Roh-Lua und implizite Variablen werden dabei
+  abgewiesen, da eine automatische Ermittlung ihrer Closures noch fehlt.
+- Browserbibliothek mit Revisionserkennung zwischen Tabs, bis zu 32 Projekten,
+  acht lokalen Sicherungen und JSON-Import/-Export. Lua-Import verwendet den
+  nativen Parser; ungültige Entwürfe bleiben als Codeknoten bearbeitbar.
+- `main.lua` mit eingebetteten Gruppen und Offline-Installer für ein neues
+  Verzeichnis. Lua-Export setzt erfolgreiche native Validierung und
+  Cobalt-Syntaxprüfung voraus. Die Vorschau führt keine Programme aus.
+- Drei Vorlagen: Hallo Werkstatt, Redstone-Schalter und zwei unabhängige Zähler.
+  Die Packseite zeigt 39 relevante Container einschließlich indirekter und
+  eingebetteter Integrationen sowie die sechs lokalen Inventarlücken.
+
+`adapters/ccvisual/native/AlphaBridge.kt` ist ein Transport- und Paketadapter.
+Der Build extrahiert die reinen Graph-/Validator-/Parser-/Generatorquellen und
+Funktions-DTOs aus CCVisual; er verändert diese Quelldateien nicht und baut
+keinen zweiten JavaScript-Lua-Generator. Der native Prozess ist nur über den
+Loopback-Vorschauserver erreichbar. Es gibt keine Browser- oder HTTP-Aktion zur
+Lua-Ausführung. Das Buildmanifest hält Quellfingerabdrücke fest und wird beim
+Start gegen die native Bridge geprüft.
+
+**Prüfgrenze:** Vollständige typisierte Modpackverträge, gerätebezogene
+Liveverfügbarkeit, ein gemeinsamer Eventdispatcher, unveränderliche externe
+Gruppenbibliotheken und Minecraft-/Mehrspielerabnahme folgen nach dieser Alpha.
+Zunächst stehen zwölf ausgewählte API-Methoden als typisierte Peripheralknoten
+bereit. Die übrigen Schnittstellen können über generische Lua-Aufrufe und
+Codeknoten angesprochen werden. Das Alpha-JSON ist ein eigenes Browserformat;
+es wird nicht als nativer CCVisual-NBT-Import ausgegeben. Eine statische
+Pages-Kopie besitzt die lokale JVM-Prüfung noch nicht.
+
+`npm test` prüft den vorhandenen öffentlichen Buildvertrag und das Alpha-Modell.
+`npm run test:alpha` prüft zusätzlich den tatsächlichen CCVisual-/Cobalt-Kern,
+einschließlich getrennter Instanzzustände, verschachtelter Gruppen,
+Mehrfachrückgaben mit nil-Lücken und einmaliger Peripheralabfragen bei mehreren
+Verbrauchern. Die Hardware wird dabei durch ausdrücklich definierte Stubs
+ersetzt. Diese Tests sind kein Minecraft-Laufzeitnachweis.
+
 Öffentlich: [Graphstudio](https://teutonstudio.github.io/.github/) ·
 [Copycat-Editor](https://teutonstudio.github.io/.github/copycat/?editor=graph).
 Der [Plan mit Bestandsaufnahme und Abnahmekriterien](../docs/GRAPHSTUDIO.md)
@@ -64,8 +144,8 @@ Vorschau: `http://127.0.0.1:4318/`. Sie bindet nur an Loopback.
 
 Transformationen benötigen Formgraphschema 4 bzw. Gebäudegraphschema 5; Vektorrechnung und der aneinanderliegende Säulenmodus benötigen Schema 5 bzw. 6.
 `sources.lock.json` pinnt den veröffentlichten Fachkerncommit
-[`640c3eb`](https://github.com/TeutonStudio/Copycat-Architecture/commit/640c3ebfb6adf5b515e49f814cd5ff3e2a110fc6)
-auf Basis 0.6.4, Branch `codex/room-area-schema-fix`. Der neuere Mod-Hauptzweig
+[`509e441`](https://github.com/TeutonStudio/Copycat-Architecture/commit/509e441a19f1645f3b1225ad7ff4948d4a1edb4e)
+auf Basis 0.6.4, Branch `codex/graphstudio-pages-core`. Der neuere Mod-Hauptzweig
 und vorhandene Release-JARs werden dadurch nicht ersetzt. Der öffentliche Build
 prüft weiterhin saubere, gepinnte Quellen und den Mindestvertrag in
 `adapters/copycat/core-contract.json`.
@@ -107,12 +187,6 @@ Dachformen an den tatsächlich gerenderten Dreiecken: Volumen, freie Sicht durch
 den Ausschnitt, Materialgruppen, Gebäudewiederholungen, leere Ergebnisse und
 unveränderte Rasterformen.
 
-Auch Drehungen direkt am Referenzknoten erhalten diese Ausschnitte und ihre
-Materialgruppen. Der Fachkern hält temporäre Transformationsergebnisse als
-gültige gespeicherte Quellgraphen. `reference-rotation.test.js` prüft Raster-
-und exakte Dach-XOR-Ausschnitte um X/Y/Z mit 90°, 180° und 270°, JSON-Rundlauf
-und anschließende Drehungen in Segmenten.
-
 ## Graphkarten, Rasterflächen und dynamische Segmente
 
 Ein Graph enthält alle nativen Knotenfamilien. Der Ergebnisknoten bestimmt den
@@ -125,25 +199,6 @@ Flächen: Quadrat, Rechteck oder direkt im 2D-Raster zeichnen. Dynamische
 Segmentachsen werden erst am Raum/Dach aufgelöst. Neue Dachknoten bieten fünf
 Vorlagenanschlüsse und ermitteln deren Anwendungsstellen automatisch.
 Flächen/Dynamik benötigen Gebäudegraphschema 7, gemeinsame Karten Schema 8.
-
-
-## Flächenwerkzeuge und Spiegelachsenraster
-
-Im Fläche-Knoten steht unter **Bedienung** die Auswahl **Malen**, **Rechteck ziehen**
-und **Quadrat ziehen**. Ein Werkzeug übernimmt eine bisher über Anzahlen definierte
-Fläche in das freie Raster. Rechteck und Quadrat zeigen beim Ziehen eine Vorschau;
-ein Loslassen übernimmt den ganzen Strich als einen rückgängig machbaren Schritt.
-Alt entfernt den gezogenen Bereich, Escape verwirft den Strich. Verkleinern einer
-Vorschau hinterlässt keine vorher überstrichenen Zellen. Die Begrenzung auf 16384
-Zellen und X/Z von −128 bis 127 bleibt erhalten; Überschreitungen verändern die
-vorherige Fläche nicht. Die bestehenden Flächenformen und Anzahlanschlüsse bleiben
-für die parametrische Eingabe verfügbar.
-
-Die Spiegelachsenauswahl belegt die gesamte verfügbare Zeilenbreite und passt ihre
-Rasterspalten an den Inspektor an. Reihenfolgeknöpfe stehen unter der Auswahl.
-Kacheln zeigen die Ebene und ihre Achsenbezeichnung; die aktive Kachel wird markiert.
-Pfeiltasten navigieren innerhalb des aktuellen Rasters, Home/End zur ersten/letzten
-Ebene. Auch die Spiegeloperation in einer Operatorfamilie verwendet diese Auswahl.
 
 ## Direkte Flächen und Segmentanordnung
 
@@ -176,8 +231,30 @@ zum Vergleichen. Die vorhandene Musteranordnung nutzt denselben Bereich.
 Die neuen direkten Verbindungen, eingebetteten Dachflächen und relativen
 Segmentversätze verwenden Gebäudegraphschema 11. Bestehende DTO-Felder und die
 Auswertung älterer Graphen bleiben erhalten. Der Browser verwendet dafür den
-kanonischen Kotlin-Fachkern. Der öffentliche Build pinnt dafür den geprüften
-Quellstand in `sources.lock.json`; ältere gespeicherte Graphen bleiben nutzbar.
+kanonischen Kotlin-Fachkern. Diese Funktionen stehen im lokalen Alpha-Build
+mit dem passenden Entwicklungskern bereit; `sources.lock.json` bleibt beim
+bisherigen öffentlichen Stand.
 
 Die [Abnahme vom 20. November 2026](reports/graphstudio-authoring-2026-11-20.md)
 enthält Prüfbefehle, Ergebnisse und Ansichten.
+
+
+### Aktuelle Knotenkonfiguration und Zahlenwerte
+
+Knotenkarte und Knotenwähler verwenden dieselben bedienbaren Entwürfe. Operation,
+Transformationsreihenfolge, Dach-/Raum-/Geschossmodus und Eingangsanzahl sind direkt
+am Knoten einstellbar. Die rechten Anschlusskreise sortieren Operanden per Ziehen
+oder Pfeiltasten einschließlich ihrer Verbindungen. Beim Geschoss stehen 3D und
+eine 2D-Raumanordnung mit gemeinsamem Undo/Redo zur Verfügung.
+
+Die Operatorfamilien umfassen Copycat-, Segment-, Positions- und Zahlenoperatoren.
+Bedingte Abbildung, Booleanlogik, Zahlenvergleich einschließlich Teilbarkeit und
+Dachvorlagen verwenden den Kotlin-Fachkern. Neue Dächer wählen zwischen Fläche
+mit Dachvorlage und Fläche mit acht Bauteilanschlüssen. Dach- und Schachtsegmente
+lassen sich mit Segmentoperatoren weiterverarbeiten.
+
+Formgraphschema 9 bzw. Gebäudegraphschema 13 unterscheiden Ganzzahl und Anzahl.
+Neue Zahlenquellen starten als Anzahl 0; Betrag, Als Anzahl und Divisionsrest sind
+native Operationen. COUNT erweitert sich implizit zu INT, die Gegenrichtung ist
+ausdrücklich. Alte Dokumente behalten beim Öffnen ihre Zahlenregeln; eine
+Hochstufung ergänzt benötigte Als-Anzahl-Knoten im selben Undo-Schritt.
