@@ -2,7 +2,7 @@
   "schema": 1,
   "copycat": {
     "repository": "https://github.com/TeutonStudio/Copycat-Architecture.git",
-    "commit": "968208750363c52f669e51482bf4c7134d4533d4",
+    "commit": "4cd505e0cecd2b6dd16be054ee3b78bc35c36c8f",
     "version": "0.6.5",
     "importedWebPath": "graphstudio/adapters/copycat/web",
     "license": "MIT"
