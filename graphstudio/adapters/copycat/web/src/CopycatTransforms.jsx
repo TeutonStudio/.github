@@ -1,3 +1,4 @@
+import { IconSelect } from './IconSelect.jsx'
 import { IntegerField } from './IntegerField.jsx'
 import { MirrorPlanePicker } from './MirrorPlanePicker.jsx'
 import { model } from './model.js'
@@ -22,8 +23,8 @@ export function CopycatTransforms({ node, edit, primary = false }) {
     {Object.entries(labels).map(([kind, label]) => <fieldset key={kind}><legend>{label}</legend>
       {steps.map((step, index) => step.kind === kind && <div className="transform-step" key={index}>
         <label className="check"><input type="checkbox" checked={step.enabled !== false} onChange={e => change(index, { enabled:e.target.checked })} />Schritt {index + 1}</label>
-        {kind === 'ROTATE' && <><label>Achse<select value={step.axis || 'Y'} onChange={e => change(index,{axis:e.target.value})}>{['X','Y','Z'].map(axis => <option key={axis}>{axis}</option>)}</select></label>
-          <label>Winkel<select value={step.quarterTurns ?? 1} onChange={e => change(index,{quarterTurns:Number(e.target.value)})}>{[0,1,2,3].map(q => <option key={q} value={q}>{q*90}°</option>)}</select></label>
+        {kind === 'ROTATE' && <><label>Achse<IconSelect domain="axis" value={step.axis || 'Y'} onChange={e => change(index,{axis:e.target.value})}>{['X','Y','Z'].map(axis => <option key={axis}>{axis}</option>)}</IconSelect></label>
+          <label>Winkel<IconSelect domain="angle" value={step.quarterTurns ?? 1} onChange={e => change(index,{quarterTurns:Number(e.target.value)})}>{[0,1,2,3].map(q => <option key={q} value={q}>{q*90}°</option>)}</IconSelect></label>
           {point(step.pivot || {x:8,y:8,z:8},value => change(index,{pivot:value}),'Drehpunkt (hB)',0,16)}</>}
         {kind === 'MIRROR' && <MirrorPlanePicker value={step.plane || 'X'} onChange={plane=>change(index,{plane})}/>}
         {kind === 'POSITION' && point(step.offset,value => change(index,{offset:value}),'Versatz (hB)',0,16)}

@@ -1,3 +1,4 @@
+from icon_select import choose, option_labels
 import json,argparse,re
 from pathlib import Path
 from playwright.sync_api import sync_playwright,expect
@@ -39,7 +40,7 @@ with sync_playwright() as p:
  page.locator('.react-flow__node[data-id="op"] strong').click()
  page.locator('.preview-panel').first.get_by_role('button',name='Selektiert',exact=True).click()
  panel=page.get_by_role('region',name='2D-Segmentanordnung')
- panel.get_by_role('combobox',name='Anordnungseingang',exact=True).select_option('1')
+ choose(panel.get_by_role('combobox',name='Anordnungseingang',exact=True),'1')
  expect(panel.get_by_role('spinbutton',name='Anordnung X',exact=True)).to_have_value('2')
  panel.get_by_role('spinbutton',name='Anordnung X',exact=True).fill('4')
  # Live draft makes the intersection empty, without persisting or consuming an undo step.
@@ -60,7 +61,7 @@ with sync_playwright() as p:
  material.get_by_role('searchbox').fill('minecraft:oak_log')
  material.locator('.material-list button').filter(has_text='minecraft:oak_log').click()
  expect(material.get_by_role('combobox',name='Blockzustand axis',exact=True)).to_be_visible()
- material.get_by_role('combobox',name='Blockzustand axis',exact=True).select_option('x')
+ choose(material.get_by_role('combobox',name='Blockzustand axis',exact=True),'x')
  material.get_by_role('button',name='Abbrechen',exact=True).click()
  assert export()['palette']==before['palette']
  # Reopen, apply and check the palette's block-only contract.

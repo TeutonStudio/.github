@@ -1,3 +1,4 @@
+import { IconSelect } from './IconSelect.jsx'
 import { cardTypeLabel } from './card-types.js'
 import {axisLabel,regionLabel} from './axis-labels.js'
 import { IntegerField } from './IntegerField.jsx'
@@ -10,37 +11,14 @@ import { formGroups, model } from './model.js'
 import { MaterialField } from './Workspace.jsx'
 import { copycatShapeName } from './copycat-options.js'
 
-export const names = { BOOLEAN:'Booleanwert',INT_COMPARE:'Zahlenvergleich',BOOLEAN_LOGIC:'Booleanoperator',CONDITIONAL:'Bedingte Abbildung',ROOF_TEMPLATE:'Dachvorlage',SERVICE_SHAFT_SEGMENT:'Schachtsegment',ELEVATOR_SHAFT_SEGMENT:'Aufzugssegment', REFERENCE:'Referenz',VECTOR_SPLIT:'Position zerlegen',
-  INT_ADD: 'Anzahl addieren',
-  INT_SUBTRACT: 'Anzahl subtrahieren',
-  INT_MULTIPLY: 'Anzahl multiplizieren',
-  INT_DIVIDE: 'Anzahl dividieren',
-  INT_MIN: 'Anzahl Minimum',
-  INT_MAX: 'Anzahl Maximum',
-  POSITION_ADD: 'Position addieren',
-  POSITION_SUBTRACT: 'Position subtrahieren',
-  POSITION_MULTIPLY: 'Position multiplizieren',
-  POSITION_DIVIDE: 'Position dividieren',
-  POSITION_MIN: 'Position Minimum',
-  POSITION_MAX: 'Position Maximum',
-  POSITION_X: 'Position zerlegen · X',
-  POSITION_Y: 'Position zerlegen · Y',
-  POSITION_Z: 'Position zerlegen · Z',
-
-  TRANSFORMATION:'Transformation', COPYCAT_TRANSFORM:'Copycat transformieren', SEGMENT_TRANSFORM:'Segment transformieren',
-  POSITION:'Position (hB)', TRANSLATE:'Copycat positionieren', COPYCAT_POSITION:'Copycat positionieren', INT: 'Ganzzahl', COUNT:'Anzahl',INT_ABS:'Betrag |x|',INT_TO_COUNT:'Als Anzahl',INT_REMAINDER:'Divisionsrest', ROTATION_SEGMENT: 'Rotationssegment', AREA: 'Fläche', SEGMENT_LAYOUT: 'Segmentanordnung', ROOM_GEOMETRY: 'Raumgrundriss', ROOF_LEVEL: 'Dachebene', ROOF_LAYOUT: 'Dachanordnung', STAIRWELL: 'Treppenhaus', ELEVATOR_SHAFT: 'Aufzugsschacht', SERVICE_SHAFT: 'Installationsschacht', GARDEN: 'Garten', PATH: 'Weg', ROOM_LAYOUT: 'Raumanordnung', BAY_WINDOW: 'Erker', DORMER: 'Gaube',
-  INPUT: 'Grundform', UNION: 'Vereinigung', INTERSECTION: 'Schnitt', DIFFERENCE: 'Differenz',
-  SYMMETRIC_DIFFERENCE: 'Symmetrische Differenz', ROTATE: 'Copycat rotieren', ROTATION: 'Rotation', OUTPUT: 'Ergebnis',
-  SAVED: 'Gespeicherter Copycat', MIRROR: 'Copycat spiegeln',
-  MIRRORING: 'Spiegelungen', COPYCAT_MIRROR: 'Copycat spiegeln', COPYCAT_ROTATE: 'Copycat rotieren',
-  COPYCAT_UNION: 'Copycat-Vereinigung', COPYCAT_INTERSECTION: 'Copycat-Schnitt', COPYCAT_DIFFERENCE: 'Copycat-Differenz', COPYCAT_SYMMETRIC_DIFFERENCE: 'Symmetrische Copycat-Differenz',
-  SEGMENT_MIRROR: 'Segment spiegeln', SEGMENT_ROTATE: 'Segment rotieren',
-  SEGMENT_UNION: 'Segment-Vereinigung', SEGMENT_INTERSECTION: 'Segment-Schnitt', SEGMENT_DIFFERENCE: 'Segment-Differenz', SEGMENT_SYMMETRIC_DIFFERENCE: 'Symmetrische Segment-Differenz',
-  COPYCAT: 'Referenz', SEGMENT: 'Wandsegment', PATTERN: 'Wandmuster', FLOOR: 'Boden', CEILING: 'Decke',
-  ROOM: 'Raum', STOREY: 'Geschoss', ROOF: 'Dach', BUILDING: 'Gebäude'
-}
+import {names} from './node-names.js'
+export {names} from './node-names.js'
 
 export function portName(port, node) {
+  if(port.name)return port.name
+  if(port.id==='defaultSource')return 'Standardwert'
+  if(port.id==='resultSource')return 'Ergebnis'
+  if(node.kind==='RESULT' && node.resultMode!=='VALUE')node={...node,kind:node.producerKind,resultType:null}
   if(node.kind==='CONDITIONAL')return ['Wert A · wahr','Boolean','Wert B · falsch'][Number(port.id.replace('in:',''))]
   if(node.kind==='BOOLEAN_LOGIC')return `Boolean ${Number(port.id.replace('in:',''))+1}`
   if(port.id==='roofTemplate')return 'Dachvorlage'
@@ -92,14 +70,14 @@ export function portName(port, node) {
   return `Eingang ${Number(kind) + 1}`
 }
 
-export function Field({ label, value, onChange, options, type = 'text', min, max, list, maxLength, step = 1 }) {
+export function Field({ label, value, onChange, options, type = 'text', min, max, list, maxLength, step = 1, iconDomain = 'node', iconContext = {}, choiceMeta }) {
   const [draft, setDraft] = useState(null)
-  if (options) return <label>{label}<select aria-label={label} value={value} onChange={e => onChange(typeof value === 'number' ? Number(e.target.value) : e.target.value)}>
+  if (options) return <label>{label}<IconSelect domain={iconDomain} context={iconContext} choiceMeta={choiceMeta} aria-label={label} value={value} onChange={e => onChange(typeof value === 'number' ? Number(e.target.value) : e.target.value)}>
     {options.map(option => {
       const [id, text] = Array.isArray(option) ? option : [option, option]
       return <option key={id} value={id} disabled={Array.isArray(option) && !!option[2]}>{text}</option>
     })}
-  </select></label>
+  </IconSelect></label>
   if (type === 'checkbox') return <label className="check"><input aria-label={label} type="checkbox" checked={value ?? false} onChange={e => onChange(e.target.checked)} />{label}</label>
   return <label>{label}<input aria-label={label} value={draft ?? value} type={type} min={min} max={max} step={step} list={list} maxLength={maxLength}
     onChange={e => setDraft(e.target.value)}
@@ -133,7 +111,7 @@ function NumberGrid({ entries, keys, ranges, update, prefix, scale = 1, unit = '
 
 export function NodeFields({ mode, node, document, edit, library, onChooseCopycat, onImportCopycat, onInspectNode }) {
   const field = (key, label, options, type, min, max) =>
-    <Field key={key} label={label} value={node[key]} onChange={value => edit({ [key]: value })} {...{ options, type, min, max }} />
+    <Field key={key} label={label} value={node[key]} onChange={value => edit({ [key]: value })} {...{ options, type, min, max }} iconDomain={({rotationAxis:'axis',quarterTurns:'angle',materialMode:'MaterialMode',materialGroup:'group',previewGroup:'group',preview:'preview'})[key] || 'node'} iconContext={{empty:key==='materialGroup'?'first':'all'}} />
   const number = (key, label, min, max) => field(key, label, undefined, 'number', min, max)
   const groups = formGroups(document)
   const source = model.shapes.find(shape => shape.id === (node.inlinePart || node.part)?.source)
@@ -146,7 +124,7 @@ export function NodeFields({ mode, node, document, edit, library, onChooseCopyca
     const part = node.part
     const partField = (key, label, options, type, min, max) =>
       <Field key={key} label={label} value={part[key]} onChange={value => edit({ part: { ...part, [key]: value } })}
-        {...{ options, type, min, max }} />
+        {...{ options, type, min, max }} iconDomain={key==='group'?'group':'node'} />
     const adapter = model.shapes.find(shape => shape.id === part.source)
     const groupFields = ['UNION', 'SYMMETRIC_DIFFERENCE'].includes(node.kind)
     return <>
@@ -165,7 +143,7 @@ export function NodeFields({ mode, node, document, edit, library, onChooseCopyca
       {groupFields && field('materialMode', 'Materialmodus', materialModes)}
       {node.materialMode === 'GROUPED' && field('materialGroup', 'Ergebnisgruppe', groupOptions(groups, 'Erste Gruppe'))}
       {groupFields && node.materialMode === 'SEPARATED' && node.inputs.map((_, index) =>
-        <Field key={index} label={`Gruppe Eingang ${index + 1}`} options={groupOptions(groups, 'Vom Eingang übernehmen')}
+        <Field iconDomain="group" iconContext={{empty:"inherit"}} key={index} label={`Gruppe Eingang ${index + 1}`} options={groupOptions(groups, 'Vom Eingang übernehmen')}
           value={node.inputGroups[index] ?? ''} onChange={group => edit({
             inputGroups: node.inputs.map((_, i) => i === index ? group : node.inputGroups[i] ?? '')
           })} />)}
@@ -173,7 +151,7 @@ export function NodeFields({ mode, node, document, edit, library, onChooseCopyca
     </>
   }
 
-  if(node.resultType) return null
+  if(node.resultType) return node.kind==='RESULT'&&node.resultMode!=='VALUE'?<NativeFields {...{mode,node,edit,document,library,onInspectNode}}/>:null
   if (node.id === 'empty_wall') return <p className="hint">Standardquelle für eine freie Wandöffnung.</p>
   return <>
     {field('name', 'Knotenname')}

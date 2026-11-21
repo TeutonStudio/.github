@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {readFileSync} from 'node:fs'
-import {newCard,openCard} from '../src/cards.js'
+import {legacyCard,openCard} from '../src/cards.js'
 import {cardResult} from '../src/card-types.js'
 import {describeNode,newNode,previewGraph} from '../src/generated/engine.mjs'
 import {editNode,replaceNodes,inspect,writeGraph,readGraph} from '../src/model.js'
@@ -11,7 +11,7 @@ import {groupVersions,deleteVersions,deletionState} from '../src/version-groups.
 const fixture=name=>JSON.parse(readFileSync(new URL(`../../examples/${name}.json`,import.meta.url)))
 const library=fixture('library')
 test('one card contains Copycats, integers and positions with a typed result',()=>{
- let document=newCard(),result=cardResult(document)
+ let document=legacyCard(),result=cardResult(document)
  assert.equal(document.graph.schema,8)
  assert.equal(previewGraph(true,document,library,'').count,1)
  document=replaceNodes(document,[...document.graph.nodes,{...newNode(true,'INT','value',0,0,true),countValue:7}])
@@ -42,12 +42,13 @@ test('opening a node group creates a dedicated card and saving it does not inclu
  assert.equal(previewGraph(true,opened.document,opened.library,'').value,'Ganzzahl: 12')
 })
 test('a typed scalar card can be inserted as a typed exact-version reference',()=>{
- let document=newCard();document=replaceNodes(document,[...document.graph.nodes,{...newNode(true,'INT','number',0,0,true),countValue:5}])
+ let document=legacyCard();document=replaceNodes(document,[...document.graph.nodes,{...newNode(true,'INT','number',0,0,true),countValue:5}])
  document=editNode('building',document,{...cardResult(document),resultType:'INT',inputs:['number']})
- const result=insertSavedReference({mode:'building',document:newCard(),library,materials:{},entry:{id:'entry',documentId:'definition',version:3,name:'Fünf',mode:'building',collection:'graphs',document,library}})
- const group=groupViews(result.document,inspect('building',result.document))[0]
- assert.equal(group.outputs[0].type,'INT')
- assert.equal(previewGraph(true,result.document,result.library,group.outputs[0].id).value,'Ganzzahl: 5')
+ const result=insertSavedReference({mode:'building',document:legacyCard(),library,materials:{},entry:{id:'entry',documentId:'definition',version:3,name:'Fünf',mode:'building',collection:'graphs',document,library}})
+ const ref=inspect('building',result.document).find(e=>e.node.id===result.nodeId)
+ assert.equal(ref.outputType,'INT')
+ assert.equal(ref.node.kind,'GRAPH_REFERENCE')
+ assert.equal(previewGraph(true,result.document,result.library,ref.node.id).value,'Ganzzahl: 5')
  assert.equal(result.document.graph.nodes.filter(n=>n.resultType).length,1)
 })
 test('version list groups identities and deletion is atomic with exact version locks',()=>{
@@ -77,13 +78,13 @@ test('React Flow selection changes preserve multi-selection without being replac
 
 
 test('several pure value card references do not exhaust material roles',()=>{
- let source=newCard();source=replaceNodes(source,[...source.graph.nodes,{...newNode(true,'INT','number',0,0,true),countValue:5}])
+ let source=legacyCard();source=replaceNodes(source,[...source.graph.nodes,{...newNode(true,'INT','number',0,0,true),countValue:5}])
  source=editNode('building',source,{...cardResult(source),resultType:'INT',inputs:['number']})
- let target={document:newCard(),library,materials:{}}
+ let target={document:legacyCard(),library,materials:{}}
  const roles=Object.keys(target.document.palette)
  for(let index=0;index<3;index++) target=insertSavedReference({mode:'building',...target,entry:{id:`entry${index}`,documentId:`definition${index}`,version:1,name:`Wert ${index}`,mode:'building',collection:'graphs',document:source,library}})
  assert.deepEqual(Object.keys(target.document.palette),roles)
- const groups=groupViews(target.document,inspect('building',target.document))
- assert.equal(groups.length,3)
- for(const group of groups) assert.equal(previewGraph(true,target.document,target.library,group.outputs[0].id).value,'Ganzzahl: 5')
+ const references=target.document.graph.nodes.filter(n=>n.kind==='GRAPH_REFERENCE')
+ assert.equal(references.length,3)
+ for(const ref of references) assert.equal(previewGraph(true,target.document,target.library,ref.id).value,'Ganzzahl: 5')
 })

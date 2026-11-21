@@ -1,3 +1,4 @@
+import { IconSelect } from './IconSelect.jsx'
 import { DeleteDialog } from './FileDialog.jsx'
 import { groupVersions } from './version-groups.js'
 import { dependencies, deleteVersion, mergeVersions, namedWorkspace } from './documents.js'
@@ -95,7 +96,7 @@ function MaterialPicker({ value, onChoose, onCancel }) {
     {!ids.length && <p role="status">Keine passenden Blöcke.</p>}
     {ids.length > limit && <button type="button" onClick={() => setLimit(limit + 100)}>Weitere Blöcke</button>}
     {chosen && <div className="material-detail"><div className="material-detail-identity"><BlockIcon id={materialValue(chosen,properties)}/><div><strong>{chosen}</strong><small>{catalog.owner(chosen)}</small></div></div>
-      {Object.entries(options).map(([key, values]) => <label key={key}>{key}<select aria-label={`Blockzustand ${key}`} value={properties[key] || ''} onChange={event => setProperties({ ...properties, [key]: event.target.value })}>{values.map(option => <option key={option}>{option}</option>)}</select></label>)}
+      {Object.entries(options).map(([key, values]) => <label key={key}>{key}<IconSelect domain="state" context={{property:key}} aria-label={`Blockzustand ${key}`} value={properties[key] || ''} onChange={event => setProperties({ ...properties, [key]: event.target.value })}>{values.map(option => <option key={option}>{option}</option>)}</IconSelect></label>)}
       {loading && <p role="status">Blockvorschau wird geladen …</p>}
       {preview?.missing.length > 0 && <p className="error">Fehlende Texturen: {preview.missing.join(', ')}</p>}
       {preview?.warning && <p>{preview.warning}</p>}

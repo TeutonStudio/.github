@@ -1,3 +1,4 @@
+import { IconSelect } from './IconSelect.jsx'
 import {axisLabel} from './axis-labels.js'
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { arrangementGraph, previewGraph } from './generated/engine.mjs'
@@ -68,12 +69,12 @@ export function ArrangementGrid({ node, document, library, edit, standalone=fals
     {!standalone && <summary>2D-Raster · {segments ? 'Segmente anordnen' : 'Räume anordnen'}</summary>}
     {base.error ? <p role="status">Alle Eingänge verbinden und gültige Quellen verwenden: {base.error}</p> : <>
       <div className="arrangement-tools">
-        {segments && <label>Ansicht<select aria-label="Rasteransicht" value={plane} onChange={event => {
+        {segments && <label>Ansicht<IconSelect domain="view" aria-label="Rasteransicht" value={plane} onChange={event => {
           cancelDrag(); setPlane(event.target.value); setViewport(null)
-        }}><option value="Z">Vorne · X/Y</option><option value="Y">Oben · X/Z</option><option value="X">Seite · Z/Y</option></select></label>}
-        <label>Eingang<select aria-label="Anordnungseingang" value={active} onChange={event => setSelected(Number(event.target.value))}>
+        }}><option value="Z">Vorne · X/Y</option><option value="Y">Oben · X/Z</option><option value="X">Seite · Z/Y</option></IconSelect></label>}
+        <label>Eingang<IconSelect domain="input" aria-label="Anordnungseingang" value={active} onChange={event => setSelected(Number(event.target.value))}>
           {items.map((item, i) => <option key={i} value={i}>{node.kind==='SEGMENT_DIFFERENCE' ? ['A','B'][i] : i + 1}. {item.label}</option>)}
-        </select></label>
+        </IconSelect></label>
       </div>
       <p className="hint">Gemeinsamer Ursprung: X 0 · Y 0 · Z 0. 1 Rasterzelle = 1 Block = 16 hB. Ziehen verschiebt den gewählten Eingang; Pfeiltasten bewegen ihn um einen Block. Mittlere Maustaste verschiebt die Ansicht. Escape verwirft eine laufende Bewegung.</p>
       {node.kind === 'SEGMENT_UNION' && <p className="hint">Negative Versätze verschieben den gemeinsamen lokalen Ursprung; die Lage der Segmente zueinander bleibt erhalten.</p>}
@@ -151,10 +152,10 @@ export function ArrangementGrid({ node, document, library, edit, standalone=fals
               const value = event.target.valueAsNumber
               if (Number.isInteger(value) && Math.abs(value) <= (pattern ? 128 : 64)) stage(active, { ...offset, [axis]: value })
             }} /></label>)}
-        {pattern && <><label>Drehachse<select aria-label="Anordnung Drehachse" value={transforms[active]?.axis} onChange={event => stage(active, offset, { axis: event.target.value })}>
-          {['X', 'Y', 'Z'].map(axis => <option key={axis} value={axis}>{axisLabel(axis)}</option>)}</select></label>
-          <label>Drehwinkel<select aria-label="Anordnung Drehwinkel" value={transforms[active]?.quarterTurns} onChange={event => stage(active, offset, { quarterTurns: Number(event.target.value) })}>
-            {[0, 1, 2, 3].map(q => <option key={q} value={q}>{q * 90}°</option>)}</select></label></>}
+        {pattern && <><label>Drehachse<IconSelect domain="axis" aria-label="Anordnung Drehachse" value={transforms[active]?.axis} onChange={event => stage(active, offset, { axis: event.target.value })}>
+          {['X', 'Y', 'Z'].map(axis => <option key={axis} value={axis}>{axisLabel(axis)}</option>)}</IconSelect></label>
+          <label>Drehwinkel<IconSelect domain="angle" aria-label="Anordnung Drehwinkel" value={transforms[active]?.quarterTurns} onChange={event => stage(active, offset, { quarterTurns: Number(event.target.value) })}>
+            {[0, 1, 2, 3].map(q => <option key={q} value={q}>{q * 90}°</option>)}</IconSelect></label></>}
       </fieldset></div>}
       {editable && <div className="button-row arrangement-apply"><button type="button" disabled={!patch || !valid} onClick={apply}>Anordnung übernehmen</button>
         <button type="button" disabled={!patch} onClick={() => { setPatch(null); setError('') }}>Verwerfen</button></div>}

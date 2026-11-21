@@ -93,10 +93,10 @@ test('saved whole buildings have a BUILDING reference output and isolated palett
   const raw=JSON.parse(readFileSync(new URL('../../examples/building-graph-assembly.json',import.meta.url)))
   const entry={id:'saved-building',documentId:'house',version:3,name:'Haus',mode:'building',collection:'graphs',document:raw,library}
   const inserted=insertSavedReference({mode:'building',document:building(),library,materials:{},entry})
-  const views=groupViews(inserted.document,inspect('building',inserted.document))
-  assert.equal(views[0].outputs.length,1)
-  assert.equal(views[0].outputs[0].type,'BUILDING')
-  assert.equal(previewGraph(true,inserted.document,inserted.library,views[0].previewId).count,previewGraph(true,raw,library,'').count)
+  const ref=inspect('building',inserted.document).find(e=>e.node.id===inserted.nodeId)
+  assert.equal(ref.outputType,'BUILDING')
+  assert.equal(ref.node.kind,'GRAPH_REFERENCE')
+  assert.equal(previewGraph(true,inserted.document,inserted.library,ref.node.id).count,previewGraph(true,raw,library,'').count)
 })
 test('next immutable version numbers account for existing identities and versions',()=>{
   const entries=appendVersion(appendVersion([], {name:'Graph',mode:'form',document:complete()},'graph'),{name:'Graph',mode:'form',document:complete()},'graph')

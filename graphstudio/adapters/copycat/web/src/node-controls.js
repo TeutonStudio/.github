@@ -1,3 +1,6 @@
+import {configureGraphProgram} from './generated/engine.mjs'
+import {names} from './node-names.js'
+import {cardTypeLabel} from './card-types.js'
 import {model,editNode,editInputs,promoteNumbers} from './model.js'
 import {reorderDraft} from './input-list.js'
 import {axisLabel} from './axis-labels.js'
@@ -6,10 +9,23 @@ const orderNames={S:'Spiegeln',R:'Rotieren',P:'Positionieren'}
 export const get=(n,path)=>path.split('.').reduce((v,key)=>v?.[key],n)
 const set=(n,path,value)=>{const [key,...rest]=path.split('.');return {...n,[key]:rest.length?set(n[key]||{},rest.join('.'),value):value}}
 export function nodeControls(mode,node) {
- const result=[],pick=(path,label,value,choices)=>result.push({path,label,value,choices}),number=(path,label,value,min,max)=>result.push({path,label,value,min,max})
+ const domains={transformationOrder:'order',areaMode:'AreaMode',roofInputMode:'RoofInputMode',dynamicAxes:'axes',booleanValue:'boolean',operation:'operation',storeyMode:'storeyMode','roomConfig.mode':'RoomMode',producerKind:'node',resultMode:'GraphResultMode',producerOutput:'axis'}
+ const result=[],pick=(path,label,value,choices)=>result.push({path,label,value,choices,domain:domains[path] || 'type'}),number=(path,label,value,min,max)=>result.push({path,label,value,min,max})
+ if(node.resultType) {
+  pick('resultType','Ausgabetyp',node.resultType,model.cardTypes.filter(t=>t!=='VALUE').map(t=>[t,cardTypeLabel(t)]))
+  pick('resultMode','Erzeugungsmodus',node.kind==='RESULT'?node.resultMode||'CONSTRUCT':'VALUE',[['CONSTRUCT','Direkt erzeugen'],['VALUE','Wert übernehmen']])
+  if(node.kind==='RESULT'&&node.resultMode!=='VALUE') {
+   pick('producerKind','Erzeugungsart',node.producerKind||'COPYCAT',(model.resultConstructors[node.resultType]||[]).map(k=>[k,names[k]||k]))
+   if(/^POSITION_[XYZ]$/.test(node.producerKind))pick('producerOutput','Ergebnisausgang',node.producerOutput||'X',['X','Y','Z'])
+   const effective={...node,kind:node.producerKind,resultType:null}
+   result.push(...nodeControls(mode,effective))
+  }
+  return result
+ }
+ if(node.kind==='GROUP_INPUT')pick('valueType','Datentyp',node.valueType||'COUNT',model.cardTypes.map(t=>[t,cardTypeLabel(t)]))
  if(['INT','COUNT'].includes(node.kind)) {pick('$numberType','Zahlentyp',node.kind,[['COUNT','Anzahl'],['INT','Ganzzahl']]);number('countValue','Wert',node.countValue??(node.kind==='INT'&&mode==='building'?4:0),node.kind==='COUNT'?0:-2147483648,2147483647)}
  if(node.kind==='TRANSFORMATION')pick('transformationOrder','Reihenfolge',node.transformationOrder||'SRP',orders.map(v=>[v,`${v} · ${[...v].map(l=>orderNames[l]).join(' → ')}`]))
- if(node.resultType)pick('resultType','Ausgabetyp',node.resultType,model.cardTypes.filter(t=>t!=='VALUE'))
+
  if(node.kind==='AREA') {
   pick('areaMode','Flächenmodus',node.areaMode||'DRAW',[['SQUARE','Quadrat'],['RECTANGLE','Rechteck'],['DRAW','Zeichnen']])
   if(node.areaMode==='SQUARE'||node.areaMode==='RECTANGLE')number('length',node.areaMode==='SQUARE'?'Seitenlänge':axisLabel('X'),node.length,1,128)
@@ -43,8 +59,13 @@ export function configureNode(node,path,value) {
 }
 export function configureDocument(mode,document,id,path,value) {
  if(path==='$numberType')document=promoteNumbers(mode,document)
- const node=document.graph.nodes.find(n=>n.id===id)
+ let node=document.graph.nodes.find(n=>n.id===id)
+ if((['resultMode','resultType','producerKind','producerOutput','valueType'].includes(path)||path==='operation'&&node.kind==='RESULT'&&model.operators[node.producerKind])) {
+  if(node.kind!=='RESULT'&&node.resultType)document={...document,graph:{...document.graph,nodes:document.graph.nodes.map(n=>n.id===id?{...n,kind:'RESULT',resultMode:'VALUE',resultSource:n.inputs[0]||'',producerKind:'COPYCAT',inputs:[],levels:{},roof:''}:n)}}
+  return {...document,graph:configureGraphProgram(document,id,path,String(value))}
+ }
  if(path==='$inputOrder')return editInputs(mode,document,id,value)
  if(path==='$inputCount') {let next=document;while(next.graph.nodes.find(n=>n.id===id).inputs.length!==Number(value)) {const count=next.graph.nodes.find(n=>n.id===id).inputs.length;next=editInputs(mode,next,id,Array.from({length:count+(count<Number(value)?1:-1)},(_,i)=>i<count?i:-1))};return next}
- return editNode(mode,document,configureNode(node,path,value))
+ const next=configureNode(node.kind==='RESULT'?{...node,kind:node.producerKind}:node,path,value)
+ return editNode(mode,document,node.kind==='RESULT'?{...next,kind:'RESULT',producerKind:next.kind}:next)
 }

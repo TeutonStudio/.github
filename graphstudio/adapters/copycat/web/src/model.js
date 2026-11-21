@@ -27,12 +27,12 @@ function retainShape(raw, before, after) {
   return result
 }
 function retainedGraph(document, graph) {
-  const building = document.graph.nodes.some(node => node.kind === 'BUILDING')
+  const building = document.graph.nodes.some(node => (node.kind === 'BUILDING' || node.kind === 'RESULT'))
   return retainShape(document.graph, normalizeDocument(building, document).graph, graph)
 }
 export function replaceNodes(document, nodes) {
   const candidate = { ...document, graph: { ...document.graph, nodes } }
-  return { ...candidate, graph: retainedGraph(candidate, replaceGraphNodes(nodes.some(node => node.kind === 'BUILDING'), document, nodes)) }
+  return { ...candidate, graph: retainedGraph(candidate, replaceGraphNodes(nodes.some(node => (node.kind === 'BUILDING' || node.kind === 'RESULT')), document, nodes)) }
 }
 
 export function readGraph(raw, mode) {
@@ -41,8 +41,8 @@ export function readGraph(raw, mode) {
   if (!bare && !raw.graph && !Array.isArray(raw.parts) && !raw.wings && !raw.patterns && !raw.palette) {
     throw new Error('Die Datei enthält weder einen Copycat-Graphen noch eine Form.')
   }
-  const isBuilding = bare ? raw.nodes.some(node => node.kind === 'BUILDING')
-    : raw.graph ? raw.graph.nodes?.some(node => node.kind === 'BUILDING')
+  const isBuilding = bare ? raw.nodes.some(node => (node.kind === 'BUILDING' || node.kind === 'RESULT'))
+    : raw.graph ? raw.graph.nodes?.some(node => (node.kind === 'BUILDING' || node.kind === 'RESULT'))
       : !raw.parts && (raw.wings || raw.patterns || raw.palette)
   if (Boolean(isBuilding) !== (mode === 'building')) throw new Error('Die Datei gehört zum anderen Editor.')
   let document = bare ? { name: 'Importierter Graph', schema: isBuilding ? 2 : 3, graph: raw } : raw
@@ -80,10 +80,10 @@ export function applyWires(mode, document, entries, wires, removed = []) {
 }
 
 export function validateLibrary(data) {
-  if (!data || typeof data !== 'object' || Array.isArray(data) || !('forms' in data || 'modules' in data)) {
+  if (!data || typeof data !== 'object' || Array.isArray(data) || !('forms' in data || 'modules' in data || 'graphs' in data)) {
     throw new Error('Erwartet wird eine Copycat-Bibliothek mit forms und/oder modules.')
   }
-  for (const key of ['forms', 'modules']) {
+  for (const key of ['forms', 'modules', 'graphs']) {
     if (key in data && (!data[key] || typeof data[key] !== 'object' || Array.isArray(data[key]))) {
       throw new Error(`Der Bibliothekseintrag ${key} muss ein Objekt sein.`)
     }

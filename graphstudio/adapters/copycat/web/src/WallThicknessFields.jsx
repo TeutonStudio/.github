@@ -1,3 +1,4 @@
+import { IconSelect } from './IconSelect.jsx'
 import { useState } from 'react'
 export function WallThicknessFields({ path, value, change, context }) {
   const [section,setSection] = useState('')
@@ -14,7 +15,7 @@ export function WallThicknessFields({ path, value, change, context }) {
   if(path==='facade.thickness') return <fieldset><legend>Fassadenstärke von außen</legend>{numeric(null,'Fassade von außen')}<p className="hint">Nur außen; bei Überlappung bleibt die Raumseite sichtbar. Die Quelle begrenzt die Tiefe.</p>{invalid&&<p role="alert">{invalid}</p>}</fieldset>
   return <fieldset><legend>Wandstärke von innen</legend>
     {[['north','Norden'],['east','Osten'],['south','Süden'],['west','Westen']].map(([key,title])=>numeric(key,title))}
-    <label>Einzelne Wand / Grenzabschnitt<select aria-label="Einzelne Wand / Grenzabschnitt" value={section} onChange={event=>setSection(event.target.value)}><option value="">Wand auswählen</option>{(context.wallSections || []).map(item=><option key={item.key} value={item.key}>{item.label}</option>)}</select></label>
+    <label>Einzelne Wand / Grenzabschnitt<IconSelect domain="wallSection" aria-label="Einzelne Wand / Grenzabschnitt" value={section} onChange={event=>setSection(event.target.value)}><option value="">Wand auswählen</option>{(context.wallSections || []).map(item=><option key={item.key} value={item.key}>{item.label}</option>)}</IconSelect></label>
     {/^(wall|boundary):.+$/.test(section)&&numeric(section,'Einzelne Wand')}
     {Object.keys(value || {}).filter(key=>key.startsWith('wall:')||key.startsWith('boundary:')).filter(key=>key!==section).map(key=>numeric(key,key))}
     <p className="hint">Einzelne Wände überschreiben ihre Himmelsrichtung. Null entfernt die Raumschicht. Die Quelle begrenzt die Tiefe; Profile werden beschnitten.</p>

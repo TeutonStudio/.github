@@ -40,6 +40,7 @@ internal object GraphModels {
     fun newShape(kind:NodeKind):GraphNode = decodeGraphNode(defaults(catalog.copycat,kind.name,catalog.copycat.nodes[kind.name].defaults))
         .let { n -> n.copy(inputs=List(if(kind in setOf(NodeKind.MIRROR,NodeKind.UNION,NodeKind.INTERSECTION,NodeKind.BOOLEAN_LOGIC)) 2 else if(kind==NodeKind.POSITION) 3 else UnifiedOperators.shapeInputs(n).min) { "" }) }
     fun newBuilding(kind:BuildingKind,explicit:Boolean):BuildingNode {
+        if(kind==BuildingKind.RESULT) return GraphPrograms.newResult()
         val model=catalog.building.nodes[kind.name]
         return decodeBuildingNode(defaults(catalog.building,kind.name,if(explicit || model.alwaysExplicit==true) model.defaults else model.legacyDefaults))
     }

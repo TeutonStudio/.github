@@ -17,6 +17,9 @@ export const nodeCategoryColor = kind => nodeCategoryColors[categoryOfNode(kind)
 export const miniMapNodeColor = node => nodeCategoryColor(node.data?.node?.kind)
 
 const descriptions = {
+ RESULT:'Den öffentlichen Ergebniswert direkt mit einer Erzeugungsart aufbauen oder einen verbundenen Wert übernehmen.',
+ GROUP_INPUT:'Einen benannten, typisierten Eingang mit optionaler Standardquelle für alle Referenzinstanzen dieses Graphen bereitstellen.',
+ GRAPH_REFERENCE:'Eine genaue gespeicherte Graphversion mit typisierten Parametereingängen referenzieren.',
   COPYCAT_OPERATOR:'Bestehende Copycat-Geometrie kombinieren, invertieren, drehen, spiegeln oder positionieren.',
   SEGMENT_OPERATOR:'Bestehende Segmentwerte exakt kombinieren und transformieren.',
   POSITION_OPERATOR:'Vorzeichenbehaftete Positionen erzeugen, berechnen und ausrichten.',

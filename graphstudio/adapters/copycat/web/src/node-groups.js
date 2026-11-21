@@ -86,7 +86,8 @@ export function insertNodeGroup(document, template, idFactory = () => `node_${cr
 export function mergeLibraries(current, incoming) {
   if (!incoming) return current
   const result = { ...incoming, ...current }
-  for (const type of ['forms', 'modules']) {
+  for (const type of ['forms', 'modules', 'graphs']) {
+    if(type==='graphs'&&!current.graphs&&!incoming.graphs)continue
     for (const [id, entry] of Object.entries(incoming[type] || {})) if (current[type]?.[id] && JSON.stringify(current[type][id]) !== JSON.stringify(entry)) {
       throw new Error(`Bibliothekskonflikt: ${id} ist im Ziel mit anderem Inhalt vorhanden. Eine andere Version verwenden.`)
     }

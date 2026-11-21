@@ -1,3 +1,5 @@
+import { nativeChoiceDomain } from './choice-icons.js'
+import { IconSelect } from './IconSelect.jsx'
 import {nodeControls} from './node-controls.js'
 import {axisLabel} from './axis-labels.js'
 import { IntegerField } from './IntegerField.jsx'
@@ -15,7 +17,7 @@ import { MaterialField } from './Workspace.jsx'
 const models = wireModels()
 const contextCarpets = model.carpets
 const Context = createContext({})
-const choiceLabels = { SQUARE:'Quadrat', RECTANGLE:'Rechteck', DRAW:'Anklicken', OVERLAY:'Vier Rotationen überlagern', ADJACENT:'Rotiert aneinander · 2×2 Blöcke', SEPARATED: 'Separiert', GROUPED: 'Gruppiert', NORMAL: 'Lokale Normale', FOOTPRINT: 'Aus Grundriss', SEGMENTS: 'Aus Segmenten', FLAT: 'Flachdach', PENT: 'Pultdach', GABLE: 'Satteldach', HIP: 'Walmdach', MANSARD: 'Mansarddach', HEIGHT: 'Firsthöhe', ANGLE: 'Dachneigung', rooms: 'Aus Räumen', walls: 'Aus Wänden', horizontal: 'Horizontal', vertical: 'Vertikal', depth: 'Tiefe', transform: 'Frei anordnen', flat: 'Flachdach', gable: 'Satteldach', AUTO: 'Automatisch', EXPLICIT: 'Explizit', OPEN: 'Offen', BOUNDARY: 'Raumgrenze', OPENING: 'Öffnung', STRUCTURE: 'Tragwerk', DECORATION: 'Dekoration' }
+const choiceLabels = { SQUARE:'Quadrat', RECTANGLE:'Rechteck', DRAW:'Anklicken', OVERLAY:'Vier Rotationen überlagern', ADJACENT:'Rotiert aneinander · 2×2 Blöcke', SEPARATED: 'Separiert', GROUPED: 'Gruppiert', NORMAL: 'Lokale Normale', FOOTPRINT: 'Aus Grundriss', SEGMENTS: 'Aus Segmenten', FLAT: 'Flachdach', PENT: 'Pultdach', GABLE: 'Satteldach', HIP: 'Walmdach', MANSARD: 'Mansarddach', CROSS:'Kreuzdach', HEIGHT: 'Firsthöhe', ANGLE: 'Dachneigung', rooms: 'Aus Räumen', walls: 'Aus Wänden', horizontal: 'Horizontal', vertical: 'Vertikal', depth: 'Tiefe', transform: 'Frei anordnen', flat: 'Flachdach', gable: 'Satteldach', AUTO: 'Automatisch', EXPLICIT: 'Explizit', OPEN: 'Offen', BOUNDARY: 'Raumgrenze', OPENING: 'Öffnung', STRUCTURE: 'Tragwerk', DECORATION: 'Dekoration' }
 const labels = {
   columnMode: 'Säulenaufbau', countValue: 'Anzahl', roofType: 'Dachart', ridge: 'Firstrichtung', overhang: 'Dachüberhang', coordinates: 'Koordinaten', layoutCells: 'Zellenbelegung', assembly: 'Expliziter Aufbau', depth: 'Tiefe',
   roofSettings:'Dachparameter',booleanValue:'Booleanwert',operation:'Operation',roofInputMode:'Dachaufbau',roofTemplate:'Dachvorlage',roofSections:'Dachflächen', config:'Dachparameter', regionCopies: 'Copycats je Bereich', roofLevel: 'Dachebene', roofConfig: 'Dachaufbau', levelIds: 'Geschosskennungen',
@@ -63,9 +65,9 @@ function Value({ type, value, change, title, path = '', settings = {} }) {
   const choices = settings.choices || context.references?.[path]
   const optional = type.endsWith('?')
   const base = type.replace(/\?$/, '')
-  const pick = options => <label>{title}<select aria-label={title} value={value ?? (base==='RotationSegmentMode'?'OVERLAY':'')} onChange={event => change(['Int', 'Long'].includes(base) ? Number(event.target.value) : event.target.value)}>
-    {options.map(option => { const key = typeof option === 'object' ? option.value : option; return <option key={String(key)} value={key}>{typeof option === 'object' ? option.label : choiceLabels[option] || option}</option> })}
-  </select></label>
+  const pick = options => <label>{title}<IconSelect domain={nativeChoiceDomain(base,path,context)} aria-label={title} value={value ?? (base==='RotationSegmentMode'?'OVERLAY':'')} onChange={event => change(['Int', 'Long'].includes(base) ? Number(event.target.value) : event.target.value)}>
+    {options.map(option => { const key = typeof option === 'object' ? option.value : option; return <option key={String(key)} value={key} iconMeta={typeof option==='object'?{kind:option.kind,type:option.outputType}:undefined}>{typeof option === 'object' ? option.label : choiceLabels[option] || option}</option> })}
+  </IconSelect></label>
   if(base === 'RotationSegmentMode') return pick([{value:'OVERLAY',label:'Vier Rotationen überlagern'},{value:'ADJACENT',label:'Rotiert aneinander · 2×2 Blöcke'}].map(option=>({...option})))
   if(path==='dynamicAxes') return <fieldset><legend>Dynamische Maße</legend>{[['X','Länge X'],['Y','Höhe Y'],['Z','Tiefe Z']].map(([axis,label])=><label className="check" key={axis}><input type="checkbox" checked={value?.includes(axis) || false} onChange={e=>change(e.target.checked?[...(value || []),axis]:(value || []).filter(item=>item!==axis))}/>{label}</label>)}</fieldset>
   if(path==='countValue') return <IntegerField label={title} value={value ?? 0} min={-2147483648} max={2147483647} onChange={change}/>
@@ -75,7 +77,7 @@ function Value({ type, value, change, title, path = '', settings = {} }) {
   if (context.group && base === 'Int' && path.endsWith('.member')) {
     const output = path.startsWith('outputs.')
     const type = output ? getPath(context.face, path.replace(/\.member$/, '.type')) : null
-    return pick([...(output ? [{ value: -1, label: 'Nicht verbunden' }] : []), ...context.members.filter(member => !output || member.outputType === type).map(member => ({ value: member.index, label: member.label }))])
+    return pick([...(output ? [{ value: -1, label: 'Nicht verbunden' }] : []), ...context.members.filter(member => !output || member.outputType === type).map(member => ({ value: member.index, label: member.label, outputType:member.outputType }))])
   }
   if (context.group && path.endsWith('.port')) {
     const member = getPath(context.face, path.replace(/\.port$/, '.member'))
@@ -114,15 +116,15 @@ function Value({ type, value, change, title, path = '', settings = {} }) {
     </div>)}
     <MapAdd numeric={args(type)[0] === 'Int'} onAdd={key => { if (!['__proto__', 'constructor', 'prototype'].includes(key) && !(key in (value || {}))) change({ ...value, [key]: initial(args(type)[1]) }) }} />
   </fieldset>
-  if (type === 'RoofSlope' && !path.endsWith('breakRatio') && context.slopes) return <label>{title}<select value={JSON.stringify(value)} onChange={event => change(JSON.parse(event.target.value))}>
+  if (type === 'RoofSlope' && !path.endsWith('breakRatio') && context.slopes) return <label>{title}<IconSelect domain="slope" value={JSON.stringify(value)} onChange={event => change(JSON.parse(event.target.value))}>
     {context.slopes.map(slope => <option key={`${slope.p}:${slope.q}`} value={JSON.stringify(slope)}>{slope.p}:{slope.q} · {(Math.atan(slope.p / slope.q) * 180 / Math.PI).toFixed(2)}°</option>)}
-  </select></label>
+  </IconSelect></label>
   if (type === 'RoofPartParameters') {
     const parameters = value || models.RoofPartParameters.default
     return <fieldset><legend>{title}</legend>
-      <label>Dachneigung<select value={`${parameters.rise}:${parameters.run}`} onChange={event => { const [rise, run] = event.target.value.split(':').map(Number); change({ ...parameters, rise, run, phase: 0, slice: 0 }) }}>
+      <label>Dachneigung<IconSelect domain="slope" value={`${parameters.rise}:${parameters.run}`} onChange={event => { const [rise, run] = event.target.value.split(':').map(Number); change({ ...parameters, rise, run, phase: 0, slice: 0 }) }}>
         {(context.slopes || model.roofSlopes).map(slope => <option key={`${slope.p}:${slope.q}`} value={`${slope.p}:${slope.q}`}>{slope.p}:{slope.q}</option>)}
-      </select></label>
+      </IconSelect></label>
       {['phase', 'slice', 'thickness', 'variant'].map(key => <Value key={key} type={models.RoofPartParameters.fields[key]} value={parameters[key]} title={label(key)} path={`${path}.${key}`} settings={key === 'variant' ? { choices: ['slope', 'eave', 'edge', 'ridge', 'hip', 'valley', 'corner', 'cap'] } : { min: key === 'slice' ? -1 : key === 'phase' ? 0 : 1, max: key === 'slice' ? parameters.rise : key === 'phase' ? parameters.run - 1 : 16 }} change={next => change({ ...parameters, [key]: next })} />)}
     </fieldset>
   }
@@ -165,11 +167,12 @@ const formWidgets = {
   SYMMETRIC_DIFFERENCE: ['materialMode', 'materialGroup', 'inputGroups'],
   ROTATE: ['rotationAxis', 'quarterTurns'], ROTATION: ['rotationAxis', 'quarterTurns'], MIRROR: ['mirror.plane'], OUTPUT: ['previewGroup'],
 }
-export function NativeFields({ mode, node, edit, document, library, onInspectNode }) {
+export function NativeFields({ mode, node: rawNode, edit, document, library, onInspectNode }) {
+  const node=rawNode.kind==='RESULT'&&rawNode.resultMode!=='VALUE'?{...rawNode,kind:rawNode.producerKind,resultType:null}:rawNode
   const [draft, setDraft] = useState(() => structuredClone(node))
   useEffect(() => setDraft(structuredClone(node)), [JSON.stringify(node)])
   const structural=new Set(nodeControls(mode,node).map(control=>control.path))
-  const fields = inspectorFields(mode, node).filter(field=>!structural.has(field.path)).filter(field=>!(node.kind==='ROOF'&&node.roofInputMode!=null&&(['roofConfig','roofSections','roofType','ridge','overhang'].includes(field.path)||field.path==='roofSettings'&&node.roofInputMode==='TEMPLATE'))).filter(field=>!(draft.dynamicAxes?.length && ['module','block'].includes(field.path))).filter(field => !(['INPUT','SAVED','COPYCAT'].includes(node.kind) && ['rotationAxis','quarterTurns','rotationPivot','translation','offset','turn','tilt','spin','top','part.top'].includes(field.path))).filter(field => !(['rotationPivot','translation'].includes(field.path) || field.path==='roofSections' && (!model.directAreas || draft.roofSections==null) || draft.roofSections!=null && ['roofType','ridge','overhang'].includes(field.path))).filter(field => !(mode === 'form' && formWidgets[node.kind]?.includes(field.path)))
+  const fields = inspectorFields(mode, node).filter(field=>!(node.inlinePart && field.path==='form')).filter(field=>!structural.has(field.path)).filter(field=>!(node.kind==='ROOF'&&node.roofInputMode!=null&&(['roofConfig','roofSections','roofType','ridge','overhang'].includes(field.path)||field.path==='roofSettings'&&node.roofInputMode==='TEMPLATE'))).filter(field=>!(draft.dynamicAxes?.length && ['module','block'].includes(field.path))).filter(field => !(['INPUT','SAVED','COPYCAT'].includes(node.kind) && ['rotationAxis','quarterTurns','rotationPivot','translation','offset','turn','tilt','spin','top','part.top'].includes(field.path))).filter(field => !(['rotationPivot','translation'].includes(field.path) || field.path==='roofSections' && (!model.directAreas || draft.roofSections==null) || draft.roofSections!=null && ['roofType','ridge','overhang'].includes(field.path))).filter(field => !(mode === 'form' && formWidgets[node.kind]?.includes(field.path)))
   const context = useMemo(() => {
     if (mode !== 'building') return { mode, library, node: draft, slopes: model.roofSlopes }
     try {
@@ -192,10 +195,10 @@ export function NativeFields({ mode, node, edit, document, library, onInspectNod
     {(draft.kind === 'ROOF' && !draft.assembly && draft.roofType === 'gable' || draft.kind === 'ROOF_LEVEL' && ['GABLE', 'CROSS', 'PENT'].includes(draft.roofLevel?.form)) && <p className="hint">Die Dachverlängerung wächst entlang des Firsts über die Giebelseiten hinaus. Dachbreite und Mauern bleiben am Gebäudegrundriss.</p>}
     {fields.map(field => <div key={field.path} data-inspector-field={field.path}>
       {context.derived?.[field.path] ? <div><label>{label(field.path)}<output>{Array.isArray(getPath(context.resolved, field.path)) ? `${getPath(context.resolved, field.path).length} Einträge` : String(getPath(context.resolved, field.path))}</output></label><button type="button" onClick={() => onInspectNode?.(context.derived[field.path])}>Quelle bearbeiten</button></div>
-        : field.path === 'module'  && node.kind === 'SEGMENT' ? <label>Segmentquelle<select value={draft.block === 'minecraft:air' ? '_air' : draft.module || '_solid'} onChange={event => {
+        : field.path === 'module'  && node.kind === 'SEGMENT' ? <label>Segmentquelle<IconSelect domain="form" value={draft.block === 'minecraft:air' ? '_air' : draft.module || '_solid'} onChange={event => {
         const value = event.target.value
         setDraft({ ...draft, module: value.startsWith('_') ? '' : value, block: value === '_air' ? 'minecraft:air' : '' })
-      }}><option value="_solid">Massive Wand</option><option value="_air">Leere Wand</option>{Object.entries(library?.modules || {}).map(([id, item]) => <option key={id} value={id}>{item.name || id}</option>)}</select></label>
+      }}><option value="_solid">Massive Wand</option><option value="_air">Leere Wand</option>{Object.entries(library?.modules || {}).map(([id, item]) => <option key={id} value={id} iconMeta={{type:"WALL"}}>{item.name || id}</option>)}</IconSelect></label>
         : field.path === 'block' && node.kind === 'SEGMENT' ? null
         : field.path === 'surfaces' ? <fieldset><legend>Materialgruppen</legend>{groups.map(group => <MaterialField key={group.id} blockOnly label={group.name} value={draft.surfaces?.[group.id] || context.palette?.[group.role === 'surface' ? draft.role : group.role] || ''} onChange={value => patch('surfaces', Object.fromEntries(groups.map(item => [item.id, item.id === group.id ? value : draft.surfaces?.[item.id] || context.palette?.[item.role === 'surface' ? draft.role : item.role] || 'minecraft:stone'])))} />)}<button type="button" onClick={() => patch('surfaces', null)}>Gebäudepalette verwenden</button></fieldset>
         : <Value type={field.path==='roofSections'?'List<RoofSection>':field.type} value={getPath(draft, field.path)} path={field.path} settings={field.path==='roofSections'?{...field,maxItems:16}:field} title={label(field.path.split('.').at(-1))} change={next => patch(field.path, next)} />}

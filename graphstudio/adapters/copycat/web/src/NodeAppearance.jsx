@@ -1,3 +1,4 @@
+import { IconSelect } from './IconSelect.jsx'
 import {OperatorChoice} from './OperatorChoice.jsx'
 import {inputsReorderable,moveInput} from './input-list.js'
 import {model} from './model.js'
@@ -17,9 +18,10 @@ function Socket({preview,...props}) {
 }
 
 // Canvas and picker share the same node rendering; picker sockets are static.
-export function NodeAppearance({data:{node,ports=[],groupName,outputType,hasOutput,diagnostic,reference,dynamicAxes=[],outputs=[],mode='building',onOperation,onControl,onInputOrder},selected=false,preview=false}) {
+export function NodeAppearance({data:{node,ports=[],groupName,outputType,producedType,hasOutput,diagnostic,reference,dynamicAxes=[],outputs=[],mode='building',onOperation,onControl,onInputOrder},selected=false,preview=false}) {
   const [dropIndex,setDropIndex]=useState(null)
-  const canSort=!!onInputOrder && inputsReorderable(node,model.nodeProperties[mode]?.[node.kind])
+  const recipe=node.kind==='RESULT'&&node.resultMode!=='VALUE'?{...node,kind:node.producerKind,resultType:null}:node
+  const canSort=!!onInputOrder && inputsReorderable(recipe,model.nodeProperties[mode]?.[recipe.kind])
   const indexOf=port=>/^(?:in:)?\d+$/.test(port.id)?Number(port.id.replace('in:','')):-1
   const sortable=port=>canSort&&indexOf(port)>=0&&indexOf(port)<node.inputs.length
   const dragType='application/x-graphstudio-input'
@@ -30,7 +32,7 @@ export function NodeAppearance({data:{node,ports=[],groupName,outputType,hasOutp
     event.preventDefault();event.stopPropagation()
     try {const from=JSON.parse(raw);if(from.node===node.id)onInputOrder(moveInput(node.inputs.length,from.index,indexOf(port)))}catch{}
   }
-  const family=operatorFamily(mode,node.kind)
+  const family=node.resultType?null:operatorFamily(mode,node.kind)
   const source = hasOutput ?? !(node.resultType || node.kind==='OUTPUT')
   return <div className={`diagram-node ${selected ? 'selected' : ''} ${diagnostic ? 'invalid' : ''} ${source ? '' : 'result-node'} ${preview ? 'node-preview' : ''}`}>
     <div className="node-heading">
@@ -38,11 +40,13 @@ export function NodeAppearance({data:{node,ports=[],groupName,outputType,hasOutp
       <div><strong>{node.resultType ? "Ergebnis" : node.name || family?.label || names[node.kind]}</strong><small>{node.resultType ? cardTypeLabel(node.resultType) : family ? operatorLabel(mode,node.kind) : node.name ? names[node.kind] : node.id}{groupName ? ` · ${groupName}` : ''}</small></div>
       {source && outputs.length<2 && <Socket preview={preview} type="source" position={Position.Right} id={outputs[0]?.id || "out"} style={{background:portStyle(outputType).color}} aria-label={`Ausgang · ${outputType}`} title={`Ausgang · ${outputType}`} />}
     </div>
+    {node.kind==='RESULT'&&node.resultMode!=='VALUE' && <div className="node-reference">Erzeugter Typ · {producedType?cardTypeLabel(producedType):'Unbestimmt'}</div>}
     {(family?.id==='numbers'||node.kind==='CONDITIONAL') && <div className="node-reference">Ausgang · {outputType?cardTypeLabel(outputType):'Unbestimmt'}</div>}
-    {model.operators?.[node.kind] && <div className="node-operation nodrag nopan"><OperatorChoice node={node} onChange={onOperation} disabled={!onOperation}/></div>}
-    {family && <div className="node-operation nodrag nopan" onPointerDown={event=>event.stopPropagation()} onClick={event=>event.stopPropagation()}><select aria-label={`${family.label} · Operation`} value={node.kind==='VECTOR_SPLIT'?'POSITION_X':node.kind==='INT'?'COUNT':node.kind} disabled={!onOperation} onChange={event=>onOperation(event.target.value)}>{family.operations.map(([kind,label])=><option key={kind} value={kind}>{label}</option>)}</select></div>}
+    {model.operators?.[recipe.kind] && <div className="node-operation nodrag nopan"><OperatorChoice node={recipe} onChange={node.kind==='RESULT'?value=>onControl?.('operation',value):onOperation} disabled={!onOperation}/></div>}
+    {family && <div className="node-operation nodrag nopan" onPointerDown={event=>event.stopPropagation()} onClick={event=>event.stopPropagation()}><IconSelect domain="operation" stripSymbols aria-label={`${family.label} · Operation`} value={node.kind==='VECTOR_SPLIT'?'POSITION_X':node.kind==='INT'?'COUNT':node.kind} disabled={!onOperation} onChange={event=>onOperation(event.target.value)}>{family.operations.map(([kind,label])=><option key={kind} value={kind}>{label}</option>)}</IconSelect></div>}
+    {node.kind==='GROUP_INPUT' && <label className="node-operation nodrag nopan">Name<input aria-label="Eingangsname" value={node.name} onChange={e=>onControl?.('name',e.target.value)} disabled={!onControl}/></label>}
     {nodeControls(mode,node).map(control=><div key={control.path} className="node-operation nodrag nopan" onPointerDown={event=>event.stopPropagation()} onClick={event=>event.stopPropagation()}>{control.choices
-      ? <label>{control.label}<select aria-label={control.label} value={control.value} disabled={!onControl} onChange={event=>onControl(control.path,event.target.value)}>{control.choices.map(choice=>{const [value,label]=Array.isArray(choice)?choice:[choice,choice];return <option value={value} key={value}>{label}</option>})}</select></label>
+      ? <label>{control.label}<IconSelect domain={control.domain || 'type'} aria-label={control.label} value={control.value} disabled={!onControl} onChange={event=>onControl(control.path,event.target.value)}>{control.choices.map(choice=>{const [value,label]=Array.isArray(choice)?choice:[choice,choice];return <option value={value} key={value}>{label}</option>})}</IconSelect></label>
       : <IntegerField disabled={!onControl} label={control.label} value={control.value} min={control.min} max={control.max} onChange={value=>onControl?.(control.path,value)}/>}</div>)}
     {outputs.length>1 && <div className="ports-output">{outputs.map(output=><div className="port" key={output.id}><span>{output.name}</span><Socket preview={preview} type="source" position={Position.Right} id={output.id} style={{background:portStyle(output.type).color}} title={`${output.name} · ${output.type}`} aria-label={`Ausgang ${output.name} · ${output.type}`}/></div>)}</div>}
     {dynamicAxes.length>0 && <div className="node-reference">Dynamisch · {dynamicAxes.join(" / ")}</div>}

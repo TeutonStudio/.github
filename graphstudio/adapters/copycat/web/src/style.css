@@ -624,3 +624,29 @@ button.danger:hover:not(:disabled),.file-list button.delete-armed {color:#fff;ba
 .port-sort-handle:active { cursor:grabbing; }
 .port.input-drop-target { box-shadow:inset 0 2px #ffe4a3; background:#ffe4a312; }
 .port-sort-handle:focus-visible { outline:1px solid #ffe4a3;outline-offset:2px; }
+
+/* Shared SVG choices: every dropdown uses the same control and popup. */
+.choice-icon {display:inline-flex;align-items:center;justify-content:center;flex:0 0 20px;width:20px;min-height:20px;position:relative;color:inherit;pointer-events:none}
+.choice-icon svg {display:block;width:16px;height:16px;flex:0 0 16px}
+.choice-icon-detailed {flex-basis:34px;width:34px;justify-content:flex-start}
+.choice-icon-detail {font:600 8px/1.2 ui-monospace,monospace;max-width:28px;padding:1px 2px;border-radius:3px;background:var(--panel,#213039);border:1px solid currentColor;position:absolute;right:-1px;bottom:-2px;white-space:nowrap}
+button.icon-select {display:inline-flex;align-items:center;justify-content:flex-start;gap:7px;min-width:0;max-width:100%;min-height:30px;padding:5px 8px;text-align:left;font:inherit;color:inherit;cursor:pointer;vertical-align:middle}
+.icon-select-value {flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.icon-select-chevron {width:14px;height:14px;flex:0 0 14px;fill:none;stroke:currentColor;stroke-width:1.6}
+.icon-select:focus-visible {outline:2px solid var(--mint,#91dad4);outline-offset:2px}
+.icon-select:disabled {cursor:default;opacity:.5}
+.icon-select-popup {position:fixed;z-index:10000;box-sizing:border-box;overflow:auto;overscroll-behavior:contain;touch-action:pan-y;padding:4px;background:var(--panel,#213039);color:var(--text,#e1eaeb);border:1px solid var(--line,#61727b);border-radius:6px;box-shadow:0 8px 24px #0008;font:12px/1.4 system-ui,sans-serif;max-width:calc(100vw - 16px)}
+.icon-select-option {display:flex;align-items:center;gap:8px;position:relative;min-height:32px;padding:5px 8px;border-radius:3px;cursor:pointer;box-sizing:border-box;border:1px solid transparent}
+.icon-select-option>span:not(.choice-icon) {overflow-wrap:anywhere;min-width:0}
+.icon-select-option.is-active {background:#3b535d;border-color:#91dad4}
+.icon-select-option[aria-selected=true] {font-weight:600}
+.icon-select-option[aria-disabled=true] {opacity:.45;cursor:default}
+.icon-select-check {margin-left:auto;flex:0 0 14px;color:var(--mint,#91dad4)}
+.node-operation .icon-select,.operator-fields .icon-select,.catalog-tools .icon-select,.filter-condition .icon-select,.input-list-row .icon-select,.native-fields label>.icon-select,.inspector-controls label>.icon-select,.area-controls .icon-select,.area-drawing-tools .icon-select,.arrangement-editor label>.icon-select,.file-filters .icon-select {width:100%}
+button.icon-select.operator-choice {display:flex;width:calc(100% - 12px);margin:6px;font-size:11px;padding:4px}
+.graph-identity .icon-select {max-width:150px;font-size:11px}
+.file-version .icon-select {flex:1}
+.is-standalone .icon-select {min-height:26px;font-size:12px}
+@media(pointer:coarse) {.icon-select-option {min-height:44px}button.icon-select {min-height:36px}}
+@media(forced-colors:active) {.icon-select-popup {border:1px solid CanvasText}.icon-select-option.is-active {outline:2px solid Highlight}.choice-icon {color:ButtonText!important}}
+svg.icon-select-check {width:14px;height:14px}

@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {newNode,describeNode,previewGraph} from '../src/generated/engine.mjs'
-import {newCard} from '../src/cards.js'
+import {legacyCard,newCard} from '../src/cards.js'
 import {replaceNodes,editNode,model,inspect} from '../src/model.js'
 import {nodePreview,pickerEntries} from '../src/node-picker.js'
 import {nodeControls,configureNode,configureDocument} from '../src/node-controls.js'
@@ -40,7 +40,7 @@ test('operator families contain generators and positions with three scalar split
  assert.equal(entries.filter(e=>e.family==='positions').length,1)
 })
 test('conditional scalar preview selects one branch and Boolean NOT changes its signature',()=>{
- let d=newCard()
+ let d=legacyCard()
  d=replaceNodes(d,[...d.graph.nodes,n('INT','a',{countValue:7}),n('INT','zero',{countValue:0}),n('INT_DIVIDE','bad',{inputs:['a','zero']}),n('BOOLEAN','flag',{booleanValue:true}),n('CONDITIONAL','pick',{inputs:['a','flag','bad']}),n('BOOLEAN_LOGIC','logic',{inputs:['flag','flag']})])
  d=editNode('building',d,{...d.graph.nodes.find(n=>n.resultType),resultType:'INT',inputs:['pick']})
  assert.equal(previewGraph(true,d,{forms:{},modules:{}},'').value,'Ganzzahl: 7')
@@ -50,7 +50,7 @@ test('conditional scalar preview selects one branch and Boolean NOT changes its 
  assert.equal(previewGraph(true,d,{forms:{},modules:{}},'logic').value,'Boolean: Falsch')
 })
 test('Positionsoperator can switch into and out of the folded three-output operation',()=>{
- let d=newCard();d=replaceNodes(d,[...d.graph.nodes,n('POSITION','p'),n('POSITION_ADD','op',{inputs:['p','p']})])
+ let d=legacyCard();d=replaceNodes(d,[...d.graph.nodes,n('POSITION','p'),n('POSITION_ADD','op',{inputs:['p','p']})])
  d=switchOperator('building',d,'op','POSITION_X')
  assert.ok(d.graph.nodeGroups.some(g=>g.id==='op'&&g.presentation==='vectorSplit'))
  assert.ok(d.graph.nodes.filter(n=>/^POSITION_[XYZ]$/.test(n.kind)).every(n=>n.inputs[0]==='p'))

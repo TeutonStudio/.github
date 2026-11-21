@@ -1,14 +1,14 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {newNode,previewGraph,transformDiagnostics} from '../src/generated/engine.mjs'
-import {newCard} from '../src/cards.js'
+import {legacyCard} from '../src/cards.js'
 import {replaceNodes,editNode,inspect,promoteNumbers,applyWires,connections,writeGraph,readGraph} from '../src/model.js'
 import {configureDocument,configureNode} from '../src/node-controls.js'
 import {nodePreview,pickerEntries} from '../src/node-picker.js'
 import {operatorFamilies,switchOperator} from '../src/operator-families.js'
 import {acceptsValue} from '../src/value-compatibility.js'
 const n=(kind,id,patch={})=>({...newNode(true,kind,id,0,0,true),...patch})
-const doc=(...nodes)=>{let d=promoteNumbers('building',newCard());return replaceNodes(d,[...d.graph.nodes,...nodes])}
+const doc=(...nodes)=>{let d=promoteNumbers('building',legacyCard());return replaceNodes(d,[...d.graph.nodes,...nodes])}
 const entry=(d,id)=>inspect('building',d).find(e=>e.node.id===id)
 const lib={forms:{},modules:{}}
 test('number drafts default to Count zero and scalar operations have exact signatures',()=>{
@@ -37,7 +37,7 @@ test('absolute value, division and remainder use native signed arithmetic and re
  d=switchOperator('building',d,'abs','INT_TO_COUNT');assert.match(transformDiagnostics(true,d,lib).find(e=>e.nodeId==='abs').message,/negative/)
 })
 test('old dimension links migrate explicitly and source type switches keep an undoable prior snapshot',()=>{
- let d=newCard();d=replaceNodes(d,[...d.graph.nodes,n('INT','old',{countValue:3}),n('AREA','area',{areaMode:'SQUARE',dimensions:{length:'old'}})])
+ let d=legacyCard();d=replaceNodes(d,[...d.graph.nodes,n('INT','old',{countValue:3}),n('AREA','area',{areaMode:'SQUARE',dimensions:{length:'old'}})])
  const before=structuredClone(d),upgraded=promoteNumbers('building',d)
  assert.equal(before.graph.schema,8);assert.equal(upgraded.graph.schema,13)
  const adapter=upgraded.graph.nodes.find(n=>n.kind==='INT_TO_COUNT');assert.ok(adapter);assert.deepEqual(adapter.inputs,['old']);assert.equal(entry(upgraded,'area').ports[0].source,adapter.id)

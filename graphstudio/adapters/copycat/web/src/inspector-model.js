@@ -12,10 +12,10 @@ export function fieldType(mode, path) {
   return type
 }
 export function inspectorFields(mode, node) {
-  const fields = { ...inspectorNode(mode, node.kind).fields }
+  const fields = { ...inspectorNode(mode, node.kind)?.fields }
   // Inline references edit the same native Part settings as form input nodes.
   if (mode === 'building' && node.kind === 'COPYCAT' && node.inlinePart) {
-    for (const path of ['part.roof', 'part.discCut']) {
+    for (const path of ['part.source','part.size','part.turn','part.top','part.offset','part.tilt','part.spin','part.roof', 'part.discCut']) {
       const native = contract.copycat.nodes.INPUT.fields[path]
       const settings = path === 'part.discCut' ? { ...native, when: { 'part.source': 'copycats:copycat_flat_pane' } } : native
       fields[path.replace('part.', 'inlinePart.')] = {

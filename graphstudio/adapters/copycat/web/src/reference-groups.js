@@ -1,7 +1,7 @@
 import {axisLabel} from './axis-labels.js'
 import { previewCopycatOption } from './copycat-options.js'
 import { newNode,previewGraph,remapBuildingReferences,compileForm,normalizeDocument,wireModels } from './generated/engine.mjs'
-import { applyWires,connections,inspect,model,position,replaceNodes } from './model.js'
+import { applyWires,connections,inspect,model,position,replaceNodes,editNode } from './model.js'
 import { identityOf } from './documents.js'
 import { insertNodeGroup,mergeLibraries } from './node-groups.js'
 import { insertFormReference,referenceDisabled } from './studio-actions.js'
@@ -73,12 +73,12 @@ function scopeLibrary(entry,namespace,currentLibrary) {
   return {scope,library,palette:Object.fromEntries(Object.entries(palette).map(([key,value])=>[roles[key],value]))}
 }
 export function libraryReferenceEntries(library) {
-  return [...Object.entries(library.forms || {}).map(([key,document])=>({id:`libraryForm:${key}`,documentId:`libraryForm:${key}`,key,name:document.name || key,version:document.version || 1,mode:'form',document,collection:'libraryForms',type:'Form'})),...Object.entries(library.modules || {}).map(([key,module])=>({id:`libraryModule:${key}`,documentId:`libraryModule:${key}`,key,name:module.name || key,version:module.version || 1,mode:'building',module,collection:'libraryModules',type:'Segment'}))]
+  return [...Object.entries(library.forms || {}).map(([key,document])=>({id:`libraryForm:${key}`,documentId:`libraryForm:${key}`,key,name:document.name || key,version:document.version || 1,mode:'form',document,collection:'libraryForms',type:'Form'})),...Object.entries(library.modules || {}).map(([key,module])=>({id:`libraryModule:${key}`,documentId:`libraryModule:${key}`,key,name:module.name || key,version:module.version || 1,mode:'building',module,collection:'libraryModules',type:'Segment'})),...Object.entries(library.graphs || {}).map(([key,definition])=>({id:`libraryGraph:${key}`,documentId:key.replace(/@[^@]+$/,''),version:Number(key.match(/@(\d+)$/)?.[1]||1),key,name:definition.document.name||key,mode:'building',document:definition.document,library:{forms:definition.forms,modules:definition.modules},collection:'libraryGraphs',type:definition.document.graph.nodes.some(n=>n.kind==='GROUP_INPUT')?'Gruppe':'Graphdefinition'}))]
 }
 function bareBuilding() {return {schema:2,name:'Vorschau',graph:{schema:1,nodes:[{id:'empty_wall',kind:'SEGMENT',block:'minecraft:air',length:1},{id:'result',kind:'BUILDING',name:'Ergebnis'}]}}}
 export function previewReferenceEntry(entry,library) {
   if(entry.preview) return entry.preview
-  if(entry.collection==='nodeGroups') {
+  if(entry.collection==='nodeGroups'&&!entry.document?.graph) {
     const base=entry.mode==='building'?bareBuilding():{schema:3,name:'Vorschau',graph:{schema:2,nodes:[{id:'result',kind:'OUTPUT',inputs:['']}]}}
     const inserted=insertNodeGroup(base,entry),added=inserted.document.graph.nodes.filter(node=>!base.graph.nodes.some(old=>old.id===node.id)), used=new Set(connections(inspect(entry.mode,inserted.document)).map(w=>w.source))
     const terminal=added.find(node=>!used.has(node.id)) || added.at(-1)
@@ -154,6 +154,7 @@ function insertGroup({mode,document,library,materials,entry,placement}) {
 export function insertSavedReference({mode,document,library,materials,entry,currentIdentity,targetId}) {
   const reason=referenceDisabled(entry,currentIdentity,false,mode)
   if(reason) throw new Error(reason)
+  if(mode==='building' && entry.document?.graph && entry.mode!=='form') return insertGraphReference({document,library,materials,entry,targetId})
   const originalEntries=inspect(mode,document), originalGroups=groupViews(document,originalEntries), oldGroup=originalGroups.find(group=>group.id===targetId)
   const oldNode=originalEntries.find(entry=>entry.node.id===targetId)?.node,placement=oldGroup?.position || (oldNode?{x:oldNode.x,y:oldNode.y}:null)
   if(targetId && !placement) throw new Error('Der zu ersetzende Knoten existiert nicht mehr.')
@@ -184,4 +185,34 @@ export function splitVector(mode,document,nodeId,origin={x:40,y:40}) {
   const group={id:groupId,name:'Position zerlegen',nodes:ids,presentation:'vectorSplit',graphInterface:{inputs:[{id:'vector',name:'Position · Vektor3',type:vectorType,targets:ids.map((_,member)=>({member,port:inputPort}))}],outputs:ids.map((_,member)=>({id:'XYZ'[member],name:axisLabel('XYZ'[member]),type:'INT',member}))},inputConnections:nodeId?{vector:nodeId}:{}}
   const candidate={...document,graph:{...document.graph,nodes:[...document.graph.nodes,...nodes],nodeGroups:[...(document.graph.nodeGroups || []),group]}}
   return {document:replaceNodes(candidate,candidate.graph.nodes),nodeId:groupId}
+}
+
+// Frozen native definitions carry their resource and nested-definition closure.
+function insertGraphReference({document,library,materials,entry,targetId}) {
+ const result=entry.document.graph.nodes.find(n=>n.resultType) || entry.document.graph.nodes.find(n=>n.kind==='BUILDING')
+ const type=result.resultType || 'BUILDING',key=`${identityOf(entry)}@${entry.version||1}`
+ const before=document.graph.nodes.find(n=>n.id===targetId)
+ if(targetId && !before)throw new Error('Die Referenz ist nicht mehr vorhanden.')
+
+ const id=before?.id || fresh('reference'),point=before?{x:before.x,y:before.y}:{x:position(Math.max(...document.graph.nodes.map(n=>n.x||0))+280),y:100}
+ const parameters=entry.document.graph.nodes.filter(n=>n.kind==='GROUP_INPUT')
+ const ordered=[...(entry.document.graph.groupInputOrder||[]),...parameters.map(n=>n.id)].filter((v,i,a)=>a.indexOf(v)===i)
+ const oldDefinition=document.graph.graphDefinitions?.[before?.referenceKey]
+ const oldParameters=oldDefinition?.document.graph.nodes.filter(n=>n.kind==='GROUP_INPUT') || []
+ const compatible=(a,b)=>a===b || a==='COUNT'&&b==='INT'
+ const currentTypes=new Map(inspect('building',document).map(e=>[e.node.id,e.outputType]))
+ const argumentsMap=Object.fromEntries(ordered.map(id=>{const source=before?.arguments?.[id]||'',actual=currentTypes.get(source);return [id,source&&(!actual||compatible(actual,parameters.find(p=>p.id===id)?.valueType))?source:'']}))
+ const node={...newNode(true,'GRAPH_REFERENCE',id,point.x,point.y,true),name:entry.name,valueType:type,referenceKey:key,arguments:argumentsMap,libraryReference:reference(entry)}
+ const resolvedNode=before?.resultType?{...before,producerKind:'GRAPH_REFERENCE',resultMode:'CONSTRUCT',referenceKey:key,valueType:type,arguments:argumentsMap,libraryReference:reference(entry),inlinePart:null,roofSettings:null,roofInputMode:null}:node
+ const definition={document:structuredClone(entry.document),forms:structuredClone(entry.library?.forms || library.forms || {}),modules:structuredClone(entry.library?.modules || library.modules || {})}
+ const existing=document.graph.graphDefinitions?.[key]
+ const graph={...document.graph,schema:14,graphDefinitions:{...document.graph.graphDefinitions,[key]:existing||definition},nodes:before?document.graph.nodes.map(n=>n.id===id?resolvedNode:n):[...document.graph.nodes,resolvedNode]}
+ // Native type editing prunes incompatible outgoing wires on version changes.
+ const candidate={...document,graph}
+ const checked=before?editNativeReference(document,candidate,resolvedNode):replaceNodes(candidate,graph.nodes)
+ return {document:checked,library:{...library,graphs:{...library.graphs,[key]:existing||definition}},materials,nodeId:id}
+}
+function editNativeReference(before,candidate,node) {
+ // Retain the frozen definition during native type propagation.
+ return editNode('building',{...before,graph:{...before.graph,graphDefinitions:candidate.graph.graphDefinitions}},node)
 }

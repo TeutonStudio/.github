@@ -125,7 +125,7 @@ und eine konkrete veröffentlichte Mod-JAR werden im Manifest unterschieden.
 
 ```sh
 cd graphstudio
-npm run internal -- --copycat "/pfad/zum/oeffentlichen-0.6.4-Entwicklungsstand" --local "/pfad/zur/lokalen/Copycat Architect"
+npm run internal -- --copycat "/pfad/zum/oeffentlichen-0.6.5-Entwicklungsstand" --local "/pfad/zur/lokalen/Copycat Architect"
 npm run preview -- --internal
 ```
 
@@ -145,7 +145,7 @@ Vorschau: `http://127.0.0.1:4318/`. Sie bindet nur an Loopback.
 Transformationen benötigen Formgraphschema 4 bzw. Gebäudegraphschema 5; Vektorrechnung und der aneinanderliegende Säulenmodus benötigen Schema 5 bzw. 6.
 `sources.lock.json` pinnt den veröffentlichten Fachkerncommit
 [`509e441`](https://github.com/TeutonStudio/Copycat-Architecture/commit/509e441a19f1645f3b1225ad7ff4948d4a1edb4e)
-auf Basis 0.6.4, Branch `codex/graphstudio-pages-core`. Der neuere Mod-Hauptzweig
+auf Basis 0.6.5, Branch `codex/graphstudio-pages-core`. Der neuere Mod-Hauptzweig
 und vorhandene Release-JARs werden dadurch nicht ersetzt. Der öffentliche Build
 prüft weiterhin saubere, gepinnte Quellen und den Mindestvertrag in
 `adapters/copycat/core-contract.json`.
@@ -258,3 +258,11 @@ Neue Zahlenquellen starten als Anzahl 0; Betrag, Als Anzahl und Divisionsrest si
 native Operationen. COUNT erweitert sich implizit zu INT, die Gegenrichtung ist
 ausdrücklich. Alte Dokumente behalten beim Öffnen ihre Zahlenregeln; eine
 Hochstufung ergänzt benötigte Als-Anzahl-Knoten im selben Undo-Schritt.
+
+### Ergebnis und Graphparameter (0.6.5)
+
+Neue Graphkarten erzeugen ihren Copycat unmittelbar am Ergebnis. Ausgabetyp, Erzeugungsmodus und Erzeugungsart stehen auf der Knotenkarte; die Anschlüsse und Einstellungen stammen vom normalen Fachknoten. Bestehende Karten bleiben im Modus „Wert übernehmen“.
+
+Gruppeneingänge definieren die öffentliche Schnittstelle eines Graphen. Ihre stabilen Knotenkennungen identifizieren die Argumentanschlüsse; Name, Datentyp, Standardquelle und gespeicherte Reihenfolge können bearbeitet werden. Eine gespeicherte Referenz bindet eine genaue Version samt Bibliotheksabhängigkeiten ein. Dies gilt auch für Dachvorlagen und verschachtelte Referenzen.
+
+Gebäudegraphschema 14 ergänzt diese Funktionen. Formgraphschema 9 und bisherige Gebäudegraphen bleiben lesbar. Die Auswahlfelder verwenden die gemeinsam übernommenen SVG-Icons.

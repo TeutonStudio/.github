@@ -49,6 +49,7 @@ fun exportDocument(isBuilding:Boolean,document:dynamic):Json = if(isBuilding) {
 
 @JsExport
 fun graphModels(): Json = json(
+    "resultConstructors" to json(*GraphCards.types.map { type->type to GraphPrograms.constructors(type).map { it.name }.toTypedArray() }.toTypedArray()),
     "operators" to JSON.parse<dynamic>(graphCatalogJson).operators,"cardTypes" to GraphCards.types.toTypedArray(),"release" to graphRelease,"catalogSha256" to graphCatalogHash,
     "copycatSchemas" to GraphModels.copycat.graphSchemas.toTypedArray(),
     "buildingSchemas" to GraphModels.building.graphSchemas.toTypedArray(),
@@ -81,8 +82,8 @@ fun graphModels(): Json = json(
     "positionMin" to GraphModels.coordinates.first, "positionMax" to GraphModels.coordinates.last
 )
 
-private fun inspectBuilding(n:BuildingNode,graph:BuildingGraph):Json=json("dynamicAxes" to DynamicSegments.axes(graph,n.id).map { it.name }.toTypedArray(),"node" to n.jsNode(),"outputType" to (n.resultType ?: buildingValueType(graph,n)),
-    "ports" to BuildingPorts.of(n,graph,true).map { port -> json("id" to port.key,"source" to port.source,"accepts" to port.accepts.map { it.name }.toTypedArray(),
+private fun inspectBuilding(n:BuildingNode,graph:BuildingGraph):Json=json("dynamicAxes" to runCatching { DynamicSegments.axes(graph,n.id).map { it.name } }.getOrDefault(emptyList()).toTypedArray(),"node" to n.jsNode(),"producedType" to buildingValueType(graph,n),"outputType" to (n.resultType ?: buildingValueType(graph,n)),
+    "ports" to BuildingPorts.of(n,graph,true).map { port -> json("id" to port.key,"source" to port.source,"name" to (if(port.key=="defaultSource") "Standardwert" else if(port.key=="resultSource") "Ergebnis" else if(port.key.startsWith("arg:")) graph.graphDefinitions.orEmpty()[n.referenceKey]?.document?.graph?.let { g->GraphPrograms.parameters(g).firstOrNull { it.id==port.key.removePrefix("arg:") }?.name } else null),"accepts" to port.accepts.map { it.name }.toTypedArray(),
         "types" to nativePortTypes(port).toTypedArray(),"length" to port.length,"height" to port.height) }.toTypedArray())
 private fun inspectShape(value:GraphNode,graph:NodeGraph):Json { val n=value.withValueSockets();return json("node" to value.jsNode(),"outputType" to shapeValueType(graph,n),
     "ports" to shapeInputSlots(n).map { index -> json("id" to index.toString(),"source" to n.inputs[index],"types" to arrayOf(shapeSocketType(graph,n,index) ?: "VALUE"),
@@ -253,9 +254,11 @@ fun previewGraph(isBuilding: Boolean, document: dynamic, library: dynamic, selec
     val modules = map(library.modules) { obj, key -> module(obj[key]) }
     val rawGraph = requireNotNull(b.graph)
     val rawResult=rawGraph.resultNode()
-    val graph=rawGraph
+    val prepared=GraphPrograms.expand(rawGraph,b.palette,forms,modules)
+    val graph=prepared.graph
     val result=graph.resultNode()
-    val cardTarget=if((selected.isEmpty() || selected==result.id) && result.resultType!=null) result.inputs.firstOrNull().orEmpty().also { require(it.isNotEmpty()) { "Connect the graph result" } } else selected
+    val cardTarget=if((selected.isEmpty() || selected==result.id) && result.resultType!=null) GraphPrograms.resultSource(result).also { require(it.isNotEmpty()) { "Ergebnis verbinden" } } else selected
+    GraphPrograms.diagnostic(graph,result)?.let { error(it) }
     val selectedNode=cardTarget.takeIf(String::isNotEmpty)?.let { selectedBuildingNode(graph,it) }
     if(selectedNode?.kind?.name in UnifiedOperators.valueKinds) {
         val value=UnifiedOperators.value(UnifiedOperators.buildingValueNodes(graph.nodes),selectedNode!!.id)
@@ -275,7 +278,7 @@ fun previewGraph(isBuilding: Boolean, document: dynamic, library: dynamic, selec
         return json("count" to 0,"raw" to 0,"meshes" to emptyArray<Json>(),"value" to value.ifEmpty { "Identität (leere Liste)" })
     }
     val plan = if(cardTarget.isEmpty()) BuildingGraphCompiler.compile(b,forms,modules).plan
-        else BuildingGraphCompiler.Evaluation(graph,b.palette,forms,modules).let { evaluation ->
+        else BuildingGraphCompiler.Evaluation(graph,prepared.palette,prepared.forms,prepared.modules).let { evaluation ->
             if(graph.nodes.first { it.id==cardTarget }.kind in setOf(BuildingKind.FLOOR,BuildingKind.CEILING)) evaluation.contextualPlatePreview(cardTarget) else evaluation.preview(cardTarget)
         }
     val filter = graph.nodes.firstOrNull { it.id == selected }?.preview
@@ -417,8 +420,8 @@ fun editorContract():Json=JSON.parse<Json>(graphCatalogJson)
 @JsExport
 fun inspectorContext(document:dynamic,id:String):Json {
     val b=building(document);val graph=requireNotNull(b.graph)
-    val node=graph.nodes.first { it.id==id }
-    val ports=BuildingPorts.of(node,graph,true)
+    val node=GraphPrograms.producer(graph.nodes.first { it.id==id })
+    val ports=BuildingPorts.of(graph.nodes.first { it.id==id },graph,true)
     val encoded=encodeBuildingNode(node).asDynamic()
     val references=json()
     fun visit(value:dynamic,path:List<String>) {
@@ -562,15 +565,15 @@ fun transformDiagnostics(isBuilding:Boolean,document:dynamic,library:dynamic):Ar
 } else {
     val b=building(document);val graph=requireNotNull(b.graph)
     val evaluation=BuildingGraphCompiler.Evaluation(graph,b.palette,map(library.forms) {obj,key->form(obj[key])},map(library.modules) {obj,key->module(obj[key])})
-    graph.nodes.filter { it.dimensions.orEmpty().isNotEmpty() || it.kind.name in GraphValues.kinds || !it.copycatTransforms.isNullOrEmpty() || it.kind in BuildingCopycatTransforms.operatorKinds }.mapNotNull { n ->
-        runCatching { if(n.dimensions.orEmpty().isNotEmpty()) BuildingCounts.resolve(graph,n,true) else if(n.kind.name in GraphValues.integerKinds) numericBuilding(graph).integer(n.id) else if(n.kind.name in GraphValues.vectorKinds) numericBuilding(graph).vector(n.id) else if(n.kind.name in setOf("BOOLEAN","INT_COMPARE","BOOLEAN_LOGIC")) buildingBooleanValue(graph,n.id) else evaluation.preview(n.id) }.exceptionOrNull()?.let { json("nodeId" to n.id,"message" to (it.message ?: "Invalid Copycat transformation")) }
+    graph.nodes.filter { it.kind==BuildingKind.RESULT || it.dimensions.orEmpty().isNotEmpty() || it.kind.name in GraphValues.kinds || !it.copycatTransforms.isNullOrEmpty() || it.kind in BuildingCopycatTransforms.operatorKinds }.mapNotNull { n ->
+        runCatching { GraphPrograms.diagnostic(graph,n)?.let { error(it) };if(n.kind==BuildingKind.RESULT) evaluation.preview(n.id) else if(n.dimensions.orEmpty().isNotEmpty()) BuildingCounts.resolve(graph,n,true) else if(n.kind.name in GraphValues.integerKinds) numericBuilding(graph).integer(n.id) else if(n.kind.name in GraphValues.vectorKinds) numericBuilding(graph).vector(n.id) else if(n.kind.name in setOf("BOOLEAN","INT_COMPARE","BOOLEAN_LOGIC")) buildingBooleanValue(graph,n.id) else evaluation.preview(n.id) }.exceptionOrNull()?.let { json("nodeId" to n.id,"message" to (it.message ?: "Invalid Copycat transformation")) }
     }.toTypedArray()
 }
 
 /** Area preview uses the same resolved cells as every geometry consumer. */
 @JsExport
 fun areaGraph(document:dynamic,id:String):Json {
-    val graph=buildingGraph(document.graph);val node=graph.nodes.first { it.id==id && it.kind==BuildingKind.AREA }
+    val graph=buildingGraph(document.graph);val node=GraphPrograms.producer(graph.nodes.first { it.id==id });require(node.kind==BuildingKind.AREA)
     val resolved=BuildingCounts.resolve(graph,node,true);val area=graph.areaOf(resolved)
     return json("points" to area?.points.orEmpty().map { it.jsPoint() }.toTypedArray(),"width" to (area?.width ?: 0),"length" to (area?.length ?: 0))
 }
@@ -600,3 +603,25 @@ fun editGraphInputs(isBuilding:Boolean,document:dynamic,id:String,order:Array<In
     val changed=updateShapeInputs(formGraph(document.graph),id,order.toList())
     GraphCompiler.structure(changed,groups(document));encodeNodeGraph(changed)
 }
+
+@JsExport
+fun configureGraphProgram(document:dynamic,id:String,field:String,value:String):Json {
+    val graph=GraphPrograms.configure(buildingGraph(document.graph),id,field,value)
+    BuildingGraphCompiler.structure(graph)
+    return encodeBuildingGraph(graph)
+}
+@JsExport
+fun graphParameters(document:dynamic):Array<Json> = GraphPrograms.parameters(buildingGraph(document.graph)).map { json("id" to it.id,"name" to it.name,"type" to it.type,"defaultSource" to it.defaultSource) }.toTypedArray()
+
+@JsExport
+fun legacyStarterCard():Json=encodeBuilding(Building(schema=2,name="Neuer Graph",graph=GraphCards.legacyStarter()))
+
+@JsExport
+fun orderGraphParameters(document:dynamic,order:Array<String>):Json {
+    val g=buildingGraph(document.graph)
+    require(order.toSet()==GraphPrograms.parameters(g).map { it.id }.toSet() && order.distinct().size==order.size)
+    return encodeBuildingGraph(g.copy(groupInputOrder=order.toList()).withCurrentSchema())
+}
+
+@JsExport
+fun importGraphInterface(document:dynamic,face:dynamic,members:Array<String>):Json = encodeBuildingGraph(GraphPrograms.importInterface(buildingGraph(document.graph),decodeGraphGroupInterface(face),members.toList()))

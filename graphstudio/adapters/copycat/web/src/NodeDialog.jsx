@@ -1,3 +1,4 @@
+import { IconSelect } from './IconSelect.jsx'
 import { useMemo, useRef, useState } from 'react'
 import { Modal } from './Modal.jsx'
 import { names } from './Inspector.jsx'
@@ -44,14 +45,14 @@ export function NodeDialog({mode='building',kinds,count,maxNodes,onAdd,onPlace,o
       <p className="hint">Operator wählen, Anschlüsse und Erklärung prüfen. Ein Klick wählt nur die Vorschau. Ziehe den Knoten an die gewünschte Stelle auf der Karte.</p>
       <div className="node-picker-toolbar">
         <label>Suchen<input type="search" data-autofocus value={query} placeholder="Name, Operator oder Aufgabe …" onChange={event=>setQuery(event.target.value)}/></label>
-        <label>Sortieren nach<select aria-label="Sortieren nach" value={sort} onChange={event=>setSort(event.target.value)}><option value="name">Name</option><option value="category">Kategorie</option><option value="output">Ausgang</option><option value="inputs">Eingangsanzahl</option></select></label>
-        <label>Reihenfolge<select aria-label="Reihenfolge" value={direction} onChange={event=>setDirection(event.target.value)}><option value="asc">Aufsteigend</option><option value="desc">Absteigend</option></select></label>
-        <label>Gruppieren nach<select aria-label="Gruppieren nach" value={group} onChange={event=>setGroup(event.target.value)}><option value="none">Keine Gruppierung</option><option value="category">Kategorie</option><option value="output">Ausgang</option><option value="property">{capabilityLabel}</option></select></label>
+        <label>Sortieren nach<IconSelect domain="sort" aria-label="Sortieren nach" value={sort} onChange={event=>setSort(event.target.value)}><option value="name">Name</option><option value="category">Kategorie</option><option value="output">Ausgang</option><option value="inputs">Eingangsanzahl</option></IconSelect></label>
+        <label>Reihenfolge<IconSelect domain="direction" aria-label="Reihenfolge" value={direction} onChange={event=>setDirection(event.target.value)}><option value="asc">Aufsteigend</option><option value="desc">Absteigend</option></IconSelect></label>
+        <label>Gruppieren nach<IconSelect domain="grouping" aria-label="Gruppieren nach" value={group} onChange={event=>setGroup(event.target.value)}><option value="none">Keine Gruppierung</option><option value="category">Kategorie</option><option value="output">Ausgang</option><option value="property">{capabilityLabel}</option></IconSelect></label>
       </div>
       <details className="node-picker-filters"><summary>Filtern</summary><div>
-        <label>Kategorie<select aria-label="Kategorie" value={category} onChange={event=>setCategory(event.target.value)}><option value="all">Alle Kategorien</option>{nodeCategories.filter(([id])=>entries.some(entry=>entry.category===id)).map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></label>
-        <label>Ausgang<select aria-label="Ausgang" value={output} onChange={event=>setOutput(event.target.value)}><option value="all">Alle Ausgänge</option>{outputTypes.map(type=><option key={type} value={type}>{portStyle(type).symbol} {portStyle(type).name}</option>)}</select></label>
-        <label title={capabilityHint}>{capabilityLabel}<select aria-label={capabilityLabel} value={capability} onChange={event=>setCapability(event.target.value)}><option value="all">Alle Knoten</option><option value="yes">Ja · variable Eingänge, frei umsortierbar</option><option value="no">Nein</option></select></label>
+        <label>Kategorie<IconSelect domain="category" aria-label="Kategorie" value={category} onChange={event=>setCategory(event.target.value)}><option value="all">Alle Kategorien</option>{nodeCategories.filter(([id])=>entries.some(entry=>entry.category===id)).map(([id,label])=><option key={id} value={id}>{label}</option>)}</IconSelect></label>
+        <label>Ausgang<IconSelect domain="type" aria-label="Ausgang" value={output} onChange={event=>setOutput(event.target.value)}><option value="all">Alle Ausgänge</option>{outputTypes.map(type=><option key={type} value={type}>{portStyle(type).symbol} {portStyle(type).name}</option>)}</IconSelect></label>
+        <label title={capabilityHint}>{capabilityLabel}<IconSelect domain="capability" aria-label={capabilityLabel} value={capability} onChange={event=>setCapability(event.target.value)}><option value="all">Alle Knoten</option><option value="yes">Ja · variable Eingänge, frei umsortierbar</option><option value="no">Nein</option></IconSelect></label>
       </div><p className="hint">{capabilityLabel}: {capabilityHint}</p></details>
       <p className="hint" role="status">{filtered.length} passende Knoten · {count} / {maxNodes} auf der Karte</p>
       {grouped.map(([key,list])=><details className="node-picker-group" key={`${group}:${key}`} open><summary>{group!=='none' && group==='category' && <span aria-hidden="true" className="category-color" style={{backgroundColor:nodeCategoryColors[key]}}/>}{groupLabel(key)} · {list.length}</summary>

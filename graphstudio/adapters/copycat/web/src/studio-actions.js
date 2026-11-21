@@ -45,7 +45,13 @@ export function insertFormReference({mode,document,library,materials,entry,curre
   return result
 }
 export function savedReferences(document) {
-  return [...new Set([...(document.graph.nodeGroups || []).filter(group=>group.libraryReference).map(group=>`${group.libraryReference.documentId}@${group.libraryReference.version}`),...document.graph.nodes.filter(node => node.libraryReference).map(node => `${node.libraryReference.documentId}@${node.libraryReference.version}`)])]
+ const refs=new Set(),seen=new Set()
+ function visit(graph) {
+  for(const group of graph.nodeGroups||[])if(group.libraryReference)refs.add(`${group.libraryReference.documentId}@${group.libraryReference.version}`)
+  for(const node of graph.nodes||[]) {if(node.libraryReference)refs.add(`${node.libraryReference.documentId}@${node.libraryReference.version}`);if(node.referenceKey)refs.add(node.referenceKey)}
+  for(const [key,definition]of Object.entries(graph.graphDefinitions||{}))if(!seen.has(key)){seen.add(key);visit(definition.document.graph)}
+ }
+ visit(document.graph);return [...refs]
 }
 
 const noMaterials=Object.freeze({})
