@@ -13,7 +13,8 @@ import { duplicateNodes, insertFormReference, savedReferences, viewLayout, versi
 import { portStyle, portStyles } from './port-styles.js'
 import { lazy, memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
-import { Background, Controls, MiniMap, ReactFlow, useUpdateNodeInternals } from '@xyflow/react'
+import { Background, Controls, MiniMap, useUpdateNodeInternals } from '@xyflow/react'
+import { GraphCanvas } from './GraphCanvas.jsx'
 import '@xyflow/react/dist/style.css'
 import { graphParameters,orderGraphParameters,editNativeGroup, previewGraph, adaptRectangles, newNode, starterBuilding } from './generated/engine.mjs'
 import { promoteNumbers, applyWires, connections, formGroups, inspect, editNode, model, position, protectedNode, readGraph, replaceNodes, validateLibrary, writeGraph } from './model.js'
@@ -74,7 +75,7 @@ const nodeTypes = { architect: memo(DiagramNode) }
 const edgeStyle = { stroke: '#8daeb1', strokeWidth: 1.7 }
 
 function useHistory(initial) {
-  const [state, setState] = useState(() => ({ current: initial, past: [], future: [] }))
+  const [state, setState] = useState(() => ({ current: typeof initial === 'function' ? initial() : initial, past: [], future: [] }))
   const push = next => setState(({ current, past }) => ({
     current: next, past: [...past.slice(-49), current], future: []
   }))
@@ -100,11 +101,11 @@ function downloadJson(document, mode) {
 function Studio({ mode, active }) {
   const { data: savedData, update: updateWorkspace } = useWorkspace()
   const draft = savedData.drafts.graph || savedData.drafts[mode]
-  const history = useHistory(draft ? openCard(draft,baseLibrary).document : newCard())
+  const history = useHistory(() => draft ? openCard(draft,baseLibrary).document : newCard())
   const [fileIdentity,setFileIdentity] = useState(draft?.fileIdentity || null)
   const [draftIdentity,setDraftIdentity] = useState(draft?.fileIdentity || null)
   const [viewVersion,setViewVersion] = useState(null), [versionLayouts,setVersionLayouts] = useState({})
-  const [draftLibrary,setLibrary] = useState(draft ? openCard(draft,baseLibrary).library : baseLibrary)
+  const [draftLibrary,setLibrary] = useState(() => draft ? openCard(draft,baseLibrary).library : baseLibrary)
   const [draftMaterials,setMaterials] = useState(draft?.materials ?? {})
   const rawViewedEntry = [...savedData.graphs.map(e=>({...e,collection:"graphs"})),...savedData.nodeGroups.map(e=>({...e,collection:"nodeGroups"}))].find(entry => entry.id === viewVersion)
   const viewedEntry = useMemo(()=>rawViewedEntry?graphCardEntry(rawViewedEntry,baseLibrary):null,[JSON.stringify(rawViewedEntry)])
@@ -133,13 +134,10 @@ function Studio({ mode, active }) {
   const [diagnostics,setDiagnostics] = useState([])
   const [selected, setSelected] = useState(null)
   const [selectedWire, setSelectedWire] = useState(null)
-  const [dragging, setDragging] = useState({})
   const [message, setMessage] = useState(null)
   const [flow, setFlow] = useState(null)
   const [nodeDialog, setNodeDialog] = useState(false)
   const [workspace, setWorkspace] = useState(0)
-  // React Flow measurements belong to the view, never to the Minecraft document.
-  const [nodeMeasurements, setNodeMeasurements] = useState({})
   const [graphShare, setGraphShare] = useState(68)
   const [arrangementCollapsed,setArrangementCollapsed] = useState(false)
   const [arrangementDraft,setArrangementDraft] = useState(null)
@@ -160,33 +158,22 @@ function Studio({ mode, active }) {
   const visibleNode = current ?? resultNode
   const kinds = mode === 'form' ? model.form.map(type => type.kind).filter(kind => kind !== 'OUTPUT' && !['POSITION_Y','POSITION_Z'].includes(kind)) : model.building.filter(kind => !['RESULT','POSITION_Y','POSITION_Z'].includes(kind) && !(model.building.includes('SERVICE_SHAFT_SEGMENT') && ['SERVICE_SHAFT','ELEVATOR_SHAFT'].includes(kind)) && !(model.directAreas && ['SEGMENT_LAYOUT','ROOM_GEOMETRY','ROOF_LEVEL','ROOF_LAYOUT'].includes(kind)))
   const edgeId = ({ target, port }) => `${target}/${port}`
-  const nodes = useMemo(() => {
+  const nodePresentation = useMemo(() => {
     const parameters=mode==='building'?graphParameters(document):[]
     const hidden=new Set(foldedGroups.flatMap(group=>group.nodes))
     const ordinary=entries.filter(data=>!hidden.has(data.node.id)).map(data=>({
-      id:data.node.id,type:'architect',data:{...data,mode,parameters:data.node.id===resultNode.node.id?parameters:[],onParameterOrder:readOnly?undefined:order=>transact(()=>commit({...document,graph:orderGraphParameters(document,order)})),onInputOrder:readOnly?undefined:order=>transact(()=>commit(configureDocument(mode,document,data.node.id,'$inputOrder',order))),onControl:readOnly?undefined:(path,value)=>transact(()=>commit(configureDocument(mode,document,data.node.id,path,value))),onOperation:readOnly?undefined:kind=>model.operators?.[data.node.kind]?transact(()=>commit(changeOperator(mode,document,data.node.id,kind))):changeOperation(data.node.id,kind),reference:document.graph.nodes.find(node=>node.id===data.node.id)?.libraryReference,diagnostic:diagnostics.find(item=>item.nodeId===data.node.id)?.message,hasOutput:data.node.id!==resultNode.node.id,groupName:document.graph.nodeGroups?.find(group=>group.nodes.includes(data.node.id))?.name},position:dragging[data.node.id] || {x:data.node.x,y:data.node.y},selected:selectedIds.includes(data.node.id),measured:nodeMeasurements[data.node.id]
+      id:data.node.id,type:'architect',data:{...data,mode,parameters:data.node.id===resultNode.node.id?parameters:[],onParameterOrder:readOnly?undefined:order=>transact(()=>commit({...document,graph:orderGraphParameters(document,order)})),onInputOrder:readOnly?undefined:order=>transact(()=>commit(configureDocument(mode,document,data.node.id,'$inputOrder',order))),onControl:readOnly?undefined:(path,value)=>transact(()=>commit(configureDocument(mode,document,data.node.id,path,value))),onOperation:readOnly?undefined:kind=>model.operators?.[data.node.kind]?transact(()=>commit(changeOperator(mode,document,data.node.id,kind))):changeOperation(data.node.id,kind),reference:document.graph.nodes.find(node=>node.id===data.node.id)?.libraryReference,diagnostic:diagnostics.find(item=>item.nodeId===data.node.id)?.message,hasOutput:data.node.id!==resultNode.node.id,groupName:document.graph.nodeGroups?.find(group=>group.nodes.includes(data.node.id))?.name},position:{x:data.node.x,y:data.node.y}
     }))
-    const grouped=foldedGroups.map(group=>({id:group.id,type:'architect',position:dragging[group.id] || group.position,selected:selectedIds.includes(group.id),measured:nodeMeasurements[group.id],data:{node:{id:group.id,kind:group.presentation==='vectorSplit'?'VECTOR_SPLIT':'REFERENCE',name:group.name},mode,onOperation:group.presentation==='vectorSplit'&&!readOnly?kind=>changeOperation(group.id,kind):undefined,ports:group.ports.map(port=>({...port,name:port.name || portName({...port,id:port.targetPort},entries.find(e=>e.node.id===port.targetNode).node)})),outputs:group.outputs,outputType:group.outputs[0]?.type,hasOutput:group.outputs.length>0,reference:group.libraryReference,diagnostic:diagnostics.find(item=>group.nodes.includes(item.nodeId))?.message}}))
+    const grouped=foldedGroups.map(group=>({id:group.id,type:'architect',position:group.position,data:{node:{id:group.id,kind:group.presentation==='vectorSplit'?'VECTOR_SPLIT':'REFERENCE',name:group.name},mode,onOperation:group.presentation==='vectorSplit'&&!readOnly?kind=>changeOperation(group.id,kind):undefined,ports:group.ports.map(port=>({...port,name:port.name || portName({...port,id:port.targetPort},entries.find(e=>e.node.id===port.targetNode).node)})),outputs:group.outputs,outputType:group.outputs[0]?.type,hasOutput:group.outputs.length>0,reference:group.libraryReference,diagnostic:diagnostics.find(item=>group.nodes.includes(item.nodeId))?.message}}))
     return [...ordinary,...grouped]
-  },[entries,document,foldedGroups,dragging,selectedIds,nodeMeasurements,diagnostics,readOnly,mode])
+  },[entries,document,foldedGroups,diagnostics,readOnly,mode])
+  const nodes = useMemo(() => {
+    const selected = new Set(selectedIds)
+    return nodePresentation.map(node => ({...node,selected:selected.has(node.id)}))
+  }, [nodePresentation,selectedIds])
   const onNodesChange = useCallback(changes => {
-    if(changes.some(change=>change.type==='select')) setSelectedIds(previous=>selectNodes(previous,changes))
-    const measured = changes.filter(change => change.type === 'dimensions' && change.dimensions)
-    if (!measured.length) return
-    setNodeMeasurements(previous => {
-      const ids = new Set([...entries.map(({node})=>node.id),...foldedGroups.map(group=>group.id)])
-      let changed = false
-      const next = Object.fromEntries(Object.entries(previous).filter(([id]) => ids.has(id)))
-      changed = Object.keys(next).length !== Object.keys(previous).length
-      for (const { id, dimensions } of measured) {
-        if (!ids.has(id)) continue
-        if (next[id]?.width !== dimensions.width || next[id]?.height !== dimensions.height) {
-          next[id] = dimensions; changed = true
-        }
-      }
-      return changed ? next : previous
-    })
-  }, [entries,foldedGroups])
+    setSelectedIds(previous => selectNodes(previous,changes))
+  }, [])
   const edges = useMemo(() => viewWires(wires,foldedGroups).map(wire => ({
     id: edgeId(wire), source: wire.viewSource, sourceHandle: wire.sourceHandle, target: wire.viewTarget, targetHandle: wire.targetHandle,
     style: wire.source === 'empty_wall' ? { ...edgeStyle, opacity: 0.38 } : edgeStyle,
@@ -254,7 +241,6 @@ function Studio({ mode, active }) {
     setSelected(null)
     setSelectedWire(null)
     setSelectedIds([])
-    setNodeMeasurements({})
     setWorkspace(key => key + 1)
   }
   const add = (choice,screenPoint) => transact(() => {
@@ -278,10 +264,9 @@ function Studio({ mode, active }) {
     setSelectedIds([id])
     setSelectedWire(null)
   })
-  const onDrag = useCallback((_, node, moved) => setDragging(Object.fromEntries((moved?.length ? moved : [node]).map(item=>[item.id,item.position]))), [])
   const onDragStop = (_, node, moved) => {
     const positions=moveViewNodes(document,foldedGroups,moved?.length?moved:[node])
-    setDragging({})
+    if(!document.graph.nodes.some(item=>positions[item.id] && (item.x!==positions[item.id].x || item.y!==positions[item.id].y))) return
     if(readOnly) {setVersionLayouts(current=>({...current,[viewedEntry.id]:{...current[viewedEntry.id],...positions}}));return}
     transact(() => commit(replaceNodes(document,document.graph.nodes.map(item=>positions[item.id] ? {...item,...positions[item.id]} : item))))
   }
@@ -524,9 +509,9 @@ function Studio({ mode, active }) {
           </div>
         </div>
         <div className="canvas" ref={canvas}>
-          {active && <ReactFlow key={workspace} nodes={nodes} onNodesChange={onNodesChange} edges={edges} nodeTypes={nodeTypes} onInit={setFlow}
+          {active && <GraphCanvas key={workspace} nodes={nodes} onNodesChange={onNodesChange} edges={edges} nodeTypes={nodeTypes} onInit={setFlow}
             fitView fitViewOptions={{ padding: 0.15, maxZoom: 1.1 }} minZoom={0.13} maxZoom={2}
-            selectNodesOnDrag={false} onNodeDragStart={(_,node)=>{setSelected(node.id);if(!selectedIds.includes(node.id))setSelectedIds([node.id])}} onNodeDrag={onDrag} onNodeDragStop={onDragStop} deleteKeyCode={null} nodesConnectable={!readOnly} edgesReconnectable={false}
+            selectNodesOnDrag={false} onNodeDragStart={(_,node)=>{setSelected(node.id);if(!selectedIds.includes(node.id))setSelectedIds([node.id])}} onNodeDragStop={onDragStop} deleteKeyCode={null} nodesConnectable={!readOnly} edgesReconnectable={false}
             onNodeContextMenu={(event,node) => {event.preventDefault();if (!selectedIds.includes(node.id)) {setSelectedIds([node.id]);setSelected(node.id)}setContextMenu({x:Math.min(event.clientX,window.innerWidth-220),y:Math.min(event.clientY,window.innerHeight-90)})}}
             onNodeClick={(event, node) => { const ids=clickNodes(selectedIds,node.id,event.shiftKey || event.ctrlKey || event.metaKey);setSelected(ids.includes(node.id)?node.id:ids.at(-1) || null); if(entries.find(entry=>entry.node.id===node.id)?.node.kind==='AREA') setPreviewMode('selected'); setSelectedWire(null); setSelectedIds(ids); }}
             onEdgeClick={(_, edge) => { setSelectedWire(edge.id); setSelected(edge.target); setSelectedIds([]) }}
@@ -537,7 +522,7 @@ function Studio({ mode, active }) {
             <Background gap={22} size={1} color="#46606d" />
             <Controls showInteractive={false} />
             <MiniMap pannable zoomable style={{width:120,height:78}} nodeColor={miniMapNodeColor} maskColor="#18232c88" />
-          </ReactFlow>}
+          </GraphCanvas>}
         </div>
         <details className="port-legend"><summary>Anschlüsse · Legende</summary><ul>{Object.entries(portStyles).map(([key,style]) => <li key={key}><span style={{color:style.color}}>{style.symbol}</span>{style.name}</li>)}</ul><small>X / Y / Z kennzeichnen zusätzlich die Achsen. Die Typregeln bestimmen die Verbindung.</small></details>
         <div className={`canvas-footer ${message?.error ? 'error' : ''}`} role="status">
