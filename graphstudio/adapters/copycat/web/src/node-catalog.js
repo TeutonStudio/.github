@@ -52,7 +52,7 @@ const descriptions = {
   INT_COMPARE: 'Zwei Ganzzahlen oder Anzahlen vergleichen; Teilbarkeit prüft A ÷ B ∈ ℤ.',
   BOOLEAN_LOGIC: 'Wahrheitswerte mit UND, ODER, XOR oder NICHT verknüpfen.',
   CONDITIONAL: 'Bei Wahr Wert A, bei Falsch Wert B verwenden.',
-  ROOF_TEMPLATE: 'Dachparameter und acht Dachbauteile als wiederverwendbare Vorlage zusammenführen.',
+  ROOF_TEMPLATE: 'Dachparameter und 13 Dachbauteile als wiederverwendbare Vorlage zusammenführen; eine optionale Fläche zeigt das fertige Dach.',
   SERVICE_SHAFT_SEGMENT: 'Ein Installationsschachtsegment mit dynamischer Höhe und Durchbrüchen erzeugen.',
   ELEVATOR_SHAFT_SEGMENT: 'Ein Aufzugssegment mit dynamischer Höhe und geschossbezogenen Türen erzeugen.',
   ELEVATOR_SHAFT: 'Einen Aufzugsschacht mit Öffnungen zwischen den Geschossen vorsehen.',

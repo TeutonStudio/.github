@@ -11,12 +11,12 @@ import {insertSavedReference} from '../src/reference-groups.js'
 const library={forms:{},modules:{}},n=(kind,id,extra={})=>({...newNode(true,kind,id,0,0,true),...extra})
 const configure=(d,path,v)=>configureDocument('building',d,cardResult(d).id,path,v)
 function definition(){let d=configure(newCard(),'resultType','COUNT');d=replaceNodes(d,[...d.graph.nodes,n('COUNT','fallback',{countValue:3}),n('GROUP_INPUT','argument',{name:'Menge',valueType:'COUNT',defaultSource:'fallback'})]);d=configure(d,'resultMode','VALUE');const rows=inspect('building',d);return applyWires('building',d,rows,[...connections(rows),{source:'argument',target:cardResult(d).id,port:'resultSource'}])}
-test('new cards generate their native default directly and share all eight roof-template ports',()=>{
+test('new cards generate their native default directly and share all roof-template ports',()=>{
  let d=newCard();assert.equal(cardResult(d).kind,'RESULT');assert.equal(cardResult(d).resultMode,'CONSTRUCT');assert.equal(d.graph.nodes.length,2)
  assert.equal(previewGraph(true,d,library,'').count,1)
  d=configure(d,'resultType','ROOF_TEMPLATE')
- assert.deepEqual(inspect('building',d).find(e=>e.node.id===cardResult(d).id).ports.map(p=>p.id),Array.from({length:8},(_,i)=>`in:${i}`))
- assert.equal(previewGraph(true,d,library,'').value,'Dachvorlage · 0 / 8 Bauteile')
+ assert.deepEqual(inspect('building',d).find(e=>e.node.id===cardResult(d).id).ports.map(p=>p.id),[...Array.from({length:13},(_,i)=>`in:${i}`),'geometry'])
+ assert.equal(previewGraph(true,d,library,'').value,'Dachvorlage · 0 / 13 Bauteile')
  const before=JSON.stringify(d);d=configure(configure(d,'resultMode','VALUE'),'resultMode','CONSTRUCT');assert.equal(JSON.stringify(d),before)
  assert.equal(nodeControls('building',cardResult(d)).find(c=>c.path==='producerKind').value,'ROOF_TEMPLATE')
  const roof=configure(newCard(),'resultType','ROOF'),normal=nodePreview('building','ROOF')

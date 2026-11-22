@@ -264,9 +264,9 @@ fun previewGraph(isBuilding: Boolean, document: dynamic, library: dynamic, selec
         val value=UnifiedOperators.value(UnifiedOperators.buildingValueNodes(graph.nodes),selectedNode!!.id)
         return json("count" to 0,"raw" to 0,"meshes" to emptyArray<Json>(),"value" to value.toString())
     }
-    if(selectedNode?.kind?.name=="ROOF_TEMPLATE") {
+    if(selectedNode?.kind?.name=="ROOF_TEMPLATE" && selectedNode.geometry.isEmpty() && selectedNode.inputs.none(String::isNotEmpty)) {
         BuildingGraphCompiler.structure(graph)
-        return json("count" to 0,"raw" to 0,"meshes" to emptyArray<Json>(),"value" to "Dachvorlage · ${selectedNode.inputs.count(String::isNotEmpty)} / 8 Bauteile")
+        return json("count" to 0,"raw" to 0,"meshes" to emptyArray<Json>(),"value" to "Dachvorlage · ${selectedNode.inputs.count(String::isNotEmpty)} / ${RoofTemplates.variantCount} Bauteile")
     }
     if(selectedNode?.kind?.name in GraphValues.kinds) {
         BuildingGraphCompiler.structure(graph)
@@ -557,7 +557,7 @@ fun duplicateGraph(isBuilding:Boolean,document:dynamic,ids:Array<String>,copies:
 
 /** Repairable node diagnostics do not mutate a document or discard its last valid preview. */
 @JsExport
-fun transformDiagnostics(isBuilding:Boolean,document:dynamic,library:dynamic):Array<Json> = if(!isBuilding) {
+fun transformDiagnostics(isBuilding:Boolean,document:dynamic,library:dynamic,includeResult:Boolean=true):Array<Json> = if(!isBuilding) {
     val f=form(document);val graph=requireNotNull(f.graph)
     graph.nodes.filter { it.kind.name in GraphValues.kinds || !it.copycatTransforms.isNullOrEmpty() || it.kind in CopycatTransforms.operatorKinds }.mapNotNull { n ->
         runCatching { if(n.kind.name in GraphValues.integerKinds) numericShape(graph).integer(n.id) else if(n.kind.name in GraphValues.vectorKinds) numericShape(graph).vector(n.id) else if(n.kind.name in setOf("BOOLEAN","INT_COMPARE","BOOLEAN_LOGIC")) shapeBooleanValue(graph,n.id) else GraphCompiler.intermediate(graph,n.id,f.groups) }.exceptionOrNull()?.let { json("nodeId" to n.id,"message" to (it.message ?: "Invalid Copycat transformation")) }
@@ -565,7 +565,7 @@ fun transformDiagnostics(isBuilding:Boolean,document:dynamic,library:dynamic):Ar
 } else {
     val b=building(document);val graph=requireNotNull(b.graph)
     val evaluation=BuildingGraphCompiler.Evaluation(graph,b.palette,map(library.forms) {obj,key->form(obj[key])},map(library.modules) {obj,key->module(obj[key])})
-    graph.nodes.filter { it.kind==BuildingKind.RESULT || it.dimensions.orEmpty().isNotEmpty() || it.kind.name in GraphValues.kinds || !it.copycatTransforms.isNullOrEmpty() || it.kind in BuildingCopycatTransforms.operatorKinds }.mapNotNull { n ->
+    graph.nodes.filter { it.kind==BuildingKind.RESULT && includeResult || it.dimensions.orEmpty().isNotEmpty() || it.kind.name in GraphValues.kinds || !it.copycatTransforms.isNullOrEmpty() || it.kind in BuildingCopycatTransforms.operatorKinds }.mapNotNull { n ->
         runCatching { GraphPrograms.diagnostic(graph,n)?.let { error(it) };if(n.kind==BuildingKind.RESULT) evaluation.preview(n.id) else if(n.dimensions.orEmpty().isNotEmpty()) BuildingCounts.resolve(graph,n,true) else if(n.kind.name in GraphValues.integerKinds) numericBuilding(graph).integer(n.id) else if(n.kind.name in GraphValues.vectorKinds) numericBuilding(graph).vector(n.id) else if(n.kind.name in setOf("BOOLEAN","INT_COMPARE","BOOLEAN_LOGIC")) buildingBooleanValue(graph,n.id) else evaluation.preview(n.id) }.exceptionOrNull()?.let { json("nodeId" to n.id,"message" to (it.message ?: "Invalid Copycat transformation")) }
     }.toTypedArray()
 }
@@ -625,3 +625,28 @@ fun orderGraphParameters(document:dynamic,order:Array<String>):Json {
 
 @JsExport
 fun importGraphInterface(document:dynamic,face:dynamic,members:Array<String>):Json = encodeBuildingGraph(GraphPrograms.importInterface(buildingGraph(document.graph),decodeGraphGroupInterface(face),members.toList()))
+
+// Bounded runtime handles keep pointer movement independent of document decoding and roof meshing.
+private val dormerWorkspaces=linkedMapOf<Int,RoofDormerWorkspace>()
+private var nextDormerWorkspace=0
+@JsExport
+fun roofDormerModel(document:dynamic,library:dynamic,id:String):Json {
+    val b=building(document);val graph=requireNotNull(b.graph)
+    val evaluation=BuildingGraphCompiler.Evaluation(graph,b.palette,map(library.forms) { obj,key->form(obj[key]) },map(library.modules) { obj,key->module(obj[key]) })
+    val workspace=evaluation.roofDormerWorkspace(id)
+    val handle=++nextDormerWorkspace
+    dormerWorkspaces[handle]=workspace
+    while(dormerWorkspaces.size>8) dormerWorkspaces.remove(dormerWorkspaces.keys.first())
+    return json("handle" to handle,"definitions" to workspace.definitions.map { json("id" to it.id,"name" to it.name.ifBlank { it.id }) }.toTypedArray(),
+        "areas" to workspace.areas.map { area -> json("id" to area.id,"name" to area.name,"points" to area.points.map { it.jsPoint() }.toTypedArray(),
+            "instances" to area.instances.map { item -> val check=workspace.check(area.id,item);json("instance" to encodeDormerInstance(item),"valid" to check.valid,"message" to check.message,"points" to check.points.map { it.jsPoint() }.toTypedArray()) }.toTypedArray(),
+            "surfaces" to workspace.surfaces(area.id).map { face -> json("direction" to face.direction,"points" to face.points.map { json("x" to it.x,"z" to it.z) }.toTypedArray()) }.toTypedArray()) }.toTypedArray())
+}
+@JsExport
+fun checkRoofDormerPlacement(handle:Int,area:String,instance:dynamic):Json {
+    val workspace=dormerWorkspaces[handle] ?: error("Dachprüfung ist veraltet; Dach erneut auswählen")
+    val check=workspace.check(area,decodeDormerInstance(instance))
+    return json("valid" to check.valid,"message" to check.message,"points" to check.points.map { it.jsPoint() }.toTypedArray())
+}
+@JsExport
+fun releaseRoofDormerModel(handle:Int) { dormerWorkspaces.remove(handle) }

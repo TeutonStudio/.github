@@ -23,11 +23,13 @@ export function portName(port, node) {
   if(node.kind==='BOOLEAN_LOGIC')return `Boolean ${Number(port.id.replace('in:',''))+1}`
   if(port.id==='roofTemplate')return 'Dachvorlage'
   if(port.id==='geometry' && node.kind==='ROOF')return 'Fläche'
-  if((node.kind==='ROOF_TEMPLATE'||node.kind==='ROOF'&&node.roofInputMode==='SEGMENTS')&&port.id.startsWith('in:'))return ['Dachschräge gerade','Innenecke','Außenecke','First gerade','Firstkurve 90°','First T','First X','Einzelne Spitze'][Number(port.id.slice(3))]
+  if(port.id==='geometry' && node.kind==='ROOF_TEMPLATE')return 'Vorschaufläche (optional)'
+  if((node.kind==='ROOF_TEMPLATE'||node.kind==='ROOF'&&node.roofInputMode==='SEGMENTS')&&port.id.startsWith('in:'))return ['Dachschräge gerade','Innenecke','Außenecke','First gerade','Firstkurve 90°','First T','First X','Einzelne Spitze','Traufe (optional)','Ortgang (optional)','Dachknick / Übergang (optional)','Flachdach (optional)','Giebelwand (optional)'][Number(port.id.slice(3))]
   const native = { length: 'Länge (Y)', roofPeak: 'Dachspitze (optional)', roofEave: 'Dachendkante / Traufe (optional)', layout: 'Anordnung', geometry: 'Grundriss', area: 'Fläche', tread: 'Stufen', landing: 'Podest', enclosure: 'Schachtwände' }
   if(node.kind==='AREA' && ['length','height'].includes(port.id)) return `${node.areaMode==='SQUARE'?'Seitenlänge':port.id==='length'?'Breite X':'Länge Z'} · Anzahl`
   if(port.id.startsWith('area:')) return `Fläche · ${node.roofSections?.find(section=>section.id===port.id.slice(5))?.name || 'Dachfläche'}`
   if(port.id.startsWith('sectionDormer:')) return 'Gaube · Dachfläche'
+  if(node.kind==='ROOF'&&node.roofInputMode&&port.id.startsWith('semantic:dormer:')) { const id=port.id.split(':')[2];return `Gaube ${(node.dormers||[]).findIndex(i=>i.id===id)+1}` }
   if(port.id==='layout' && node.kind==='SEGMENT' || port.id==='geometry' && node.kind==='ROOM') return 'Fläche / bisherige Geometrie'
   if (native[port.id]) return native[port.id]
   if (port.id.startsWith('region:')) return regionLabel(port.id)

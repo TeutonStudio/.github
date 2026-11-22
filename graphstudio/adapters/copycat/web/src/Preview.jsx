@@ -5,6 +5,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { useWorkspace } from './Workspace.jsx'
 import { axisColors, compassDirections, sides } from './orientation.js'
 import { exactGeometry } from './preview-geometry.js'
+import { referenceFrame, updateReferenceFrame } from './preview-reference-frame.js'
+import { createPreviewRunner } from './preview-runner.js'
 
 const colors = {
   body: '#8ba4a2', cap: '#d29763', 'minecraft:stone_bricks': '#979999',
@@ -30,75 +32,6 @@ function dispose(group) {
   })
   for (const geometry of geometries) geometry.dispose()
   for (const material of materials) { material.map?.dispose(); material.dispose() }
-}
-
-function referenceFrame(group) {
-  const bounds = new THREE.Box3(new THREE.Vector3(), new THREE.Vector3(1, 1, 1))
-  const size = bounds.getSize(new THREE.Vector3()).max(new THREE.Vector3(1, 1, 1))
-  bounds.max.copy(bounds.min).add(size)
-  const geometry = new THREE.CylinderGeometry(1, 1, 1, 8)
-  const material = (color, opacity) => new THREE.MeshBasicMaterial({ color, opacity, transparent: true, depthTest: false, depthWrite: false, toneMapped: false })
-  const surfaces = ['x', 'y', 'z'].map(axis => ({
-    front: material(axisColors[axis], 0.95), back: material(axisColors[axis], 0.42)
-  }))
-  const markFront = material('#ff8b2d', 0.98)
-  const markBack = material('#ff8b2d', 0.38)
-  const cylinder = (position, direction, length, surface) => {
-    const mesh = new THREE.Mesh(geometry, surface)
-    mesh.position.copy(position)
-    mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction)
-    mesh.scale.set(0.004, length, 0.004)
-    mesh.renderOrder = 3
-    group.add(mesh)
-    return mesh
-  }
-  const edges = []
-  for (let axis = 0; axis < 3; axis++) {
-    const { front, back } = surfaces[axis]
-    const others = [0, 1, 2].filter(value => value !== axis)
-    const direction = new THREE.Vector3().setComponent(axis, 1)
-    for (const first of [0, 1]) for (const second of [0, 1]) {
-      const start = bounds.min.clone()
-      start.setComponent(others[0], first ? bounds.max.getComponent(others[0]) : bounds.min.getComponent(others[0]))
-      start.setComponent(others[1], second ? bounds.max.getComponent(others[1]) : bounds.min.getComponent(others[1]))
-      const center = start.clone().addScaledVector(direction, size.getComponent(axis) / 2)
-      const mesh = cylinder(center, direction, size.getComponent(axis), front)
-      const marks = [0.25, 0.5, 0.75].map(fraction => {
-        const position = start.clone().addScaledVector(direction, size.getComponent(axis) * fraction)
-        return { mesh: cylinder(position, new THREE.Vector3(0, 1, 0), 0.05, markFront), major: fraction === 0.5 }
-      })
-      edges.push({ mesh, marks, direction, front, back, faces: [{ axis: others[0], sign: first ? 1 : -1 }, { axis: others[1], sign: second ? 1 : -1 }] })
-    }
-  }
-  group.userData.reference = { edges, markFront, markBack }
-  return bounds
-}
-
-function updateReferenceFrame(group, camera, height) {
-  const reference = group.userData.reference
-  if (!reference) return
-  const unitsPerPixel = point => 2 * camera.position.distanceTo(point) * Math.tan(camera.fov * Math.PI / 360) / Math.max(height, 1)
-  const up = new THREE.Vector3(0, 1, 0)
-  for (const edge of reference.edges) {
-    const visible = edge.faces.some(face => face.sign * (camera.position.getComponent(face.axis) - edge.mesh.position.getComponent(face.axis)) > 0)
-    edge.mesh.material = visible ? edge.front : edge.back
-    edge.mesh.renderOrder = visible ? 3 : 2
-    const radius = unitsPerPixel(edge.mesh.position) * (visible ? 0.9 : 0.55)
-    edge.mesh.scale.x = radius
-    edge.mesh.scale.z = radius
-    for (const mark of edge.marks) {
-      const direction = edge.direction.clone().cross(camera.position.clone().sub(mark.mesh.position))
-      if (direction.lengthSq() < 0.00001) direction.copy(edge.direction).cross(camera.up)
-      if (direction.lengthSq() < 0.00001) direction.set(1, 0, 0)
-      direction.normalize()
-      const scale = unitsPerPixel(mark.mesh.position)
-      const width = scale * (mark.major ? 1.4 : 0.65)
-      mark.mesh.scale.set(width, scale * (mark.major ? 17 : 8), width)
-      mark.mesh.quaternion.setFromUnitVectors(up, direction)
-      mark.mesh.material = visible ? reference.markFront : reference.markBack
-      mark.mesh.renderOrder = visible ? 5 : 4
-    }
-  }
 }
 
 function groundCompass(group, bounds) {
@@ -389,10 +322,11 @@ export function Viewer({ plan, blockFrame, catalog, details, fitKey }) {
 export default function Preview({ mode, document, library, selected, previewMode, onMode, collapsed, onToggle, materials, onDiagnostics }) {
   const { catalog } = useWorkspace()
   const [showMaterials,setShowMaterials] = useState(false)
-  const worker = useRef(null)
+  const runner = useRef(null)
   const sequence = useRef(0)
-  const running = useRef(false)
-  const queued = useRef(null)
+  const diagnosticsCallback = useRef(onDiagnostics)
+  diagnosticsCallback.current = onDiagnostics
+  const [retry, setRetry] = useState(0)
   const [result, setResult] = useState({})
   const target = previewMode === 'selected' ? selected : ''
   const missingSelection = previewMode === 'selected' && !selected
@@ -403,44 +337,29 @@ export default function Preview({ mode, document, library, selected, previewMode
   const content = useMemo(() => JSON.stringify({
     ...document, graph: { ...document.graph, nodes: document.graph.nodes.map(({ x, y, ...node }) => node) }
   }), [document])
-  const send = () => {
-    if (!worker.current || running.current || !queued.current) return
-    running.current = true
-    worker.current.postMessage(queued.current)
-    queued.current = null
-  }
   useEffect(() => {
-    const instance = new Worker(new URL('./preview.worker.js', import.meta.url), { type: 'module' })
-    worker.current = instance
-    instance.onmessage = ({ data }) => {
-      running.current = false
-      if (data.id === sequence.current) {
-        onDiagnostics?.(data.diagnostics || [])
-        setResult(previous => data.error ? { ...previous, error: data.error, pending: false } : data)
-      }
-      send()
-    }
-    instance.onerror = event => {
-      running.current = false
-      setResult(previous => ({ ...previous, error: event.message, pending: false }))
-    }
-    return () => instance.terminate()
+    const instance = createPreviewRunner(() => new Worker(new URL('./preview.worker.js', import.meta.url), { type: 'module' }), data => {
+      if (data.id !== sequence.current) return
+      diagnosticsCallback.current?.(data.diagnostics || [])
+      setResult(previous => data.error ? { ...previous, error: data.error, pending: false } : data)
+    })
+    runner.current = instance
+    return () => { instance.dispose(); if (runner.current === instance) runner.current = null }
   }, [])
 
   useEffect(() => {
     const id = ++sequence.current
-    queued.current = null
+    runner.current?.cancel()
     if (missingSelection) {
       setResult({ error: 'Wähle einen Knoten im Graphen aus.', pending: false })
       return
     }
     const timer = setTimeout(() => {
       setResult(previous => ({ ...previous, pending: true, error: '' }))
-      queued.current = { id, mode, document: latest.current, library, selected: target, materials,viewKey:`${mode}:${document.id || document.graph.nodes.find(node=>node.resultType)?.id || document.name || "graph"}:${target}` }
-      send()
+      runner.current?.submit({ id, mode, document: latest.current, library, selected: target, materials,viewKey:`${mode}:${document.id || document.graph.nodes.find(node=>node.resultType)?.id || document.name || "graph"}:${target}` })
     }, 130)
     return () => clearTimeout(timer)
-  }, [mode, content, library, target, missingSelection, materials])
+  }, [mode, content, library, target, missingSelection, materials, retry])
 
 
   const noun = mode === 'building' ? 'Platzierungen' : 'Rasterzellen'
@@ -462,6 +381,7 @@ export default function Preview({ mode, document, library, selected, previewMode
           : result.plan ? <>{result.plan.count.toLocaleString('de-DE')} {noun} · {result.plan.raw.toLocaleString('de-DE')} Zinkeinheiten</>
             : 'Vorschau wird geladen …'}
     </div>
+    {result.error && <button type="button" onClick={() => setRetry(value => value + 1)}>Vorschau neu laden</button>}
     {result.plan?.value && <p className="preview-meta">{result.plan.value}</p>}
     {result.plan?.warnings?.map((warning, index) => <p className="preview-meta" key={index}>{warning}</p>)}
     <div className="axis-legend" aria-label="Koordinatenachsen"><span style={{color:axisColors.x}}>West (−X) · Ost (+X)</span><span style={{color:axisColors.y}}>Unten (−Y) · Oben (+Y)</span><span style={{color:axisColors.z}}>Nord (−Z) · Süd (+Z)</span>

@@ -1,3 +1,6 @@
+import {DormerProvider,DormerPlacementPanel} from './Dormers.jsx'
+import {dormerHost} from './dormer-placement.js'
+import {referenceVersions} from './reference-versions.js'
 import { nodeChoiceMeta } from './choice-icons.js'
 import { IconSelect } from './IconSelect.jsx'
 import {changeOperator} from './operators.js'
@@ -338,6 +341,7 @@ function Studio({ mode, active }) {
   const removableWire=selectedIds.length<2 && wires.some(wire=>edgeId(wire)===selectedWire)
   const canRemove=!readOnly && (removableWire || editableIds.length>0)
   const removeLabel=removableWire?'Verbindung trennen':selectedIds.length>1?'Auswahl löschen':selectedGroup?'Referenzknoten löschen':'Knoten löschen'
+  const dormerNode=mode==='building'&&!selectedGroup?dormerHost(current?.node || cardResult(document)):null
   const previewSelected = current?.node.id ?? ''
   const areaSource=n=>n?.resultType==='AREA'?(n.kind==='RESULT'?(n.resultMode==='VALUE'?n.resultSource:n.id):n.inputs[0]):n?.kind==='AREA'?n.id:null
   const areaTarget=areaSource(previewMode==='selected'?current?.node:cardResult(document))
@@ -408,9 +412,9 @@ function Studio({ mode, active }) {
     result.document=replaceNodes(next,next.graph.nodes.map(node=>moved[node.id]?{...node,...moved[node.id]}:node))
     pickerOrigin.current=null
   }
-  const insertReference = entry => transact(() => {
+  const insertReference = (entry,targetId=referenceDialog?referenceTarget:null) => transact(() => {
     if(readOnly) return
-    const result=insertSavedReference({mode,document,library,materials,entry,currentIdentity:fileIdentity,targetId:referenceDialog?referenceTarget:null})
+    const result=insertSavedReference({mode,document,library,materials,entry,currentIdentity:fileIdentity,targetId})
     locatePickerResult(result)
     commit(result.document);setLibrary(result.library);setMaterials(result.materials);setSelected(result.nodeId);setSelectedIds([result.nodeId]);setSelectedWire(null);setFileDialog(false);setReferenceDialog(false);setReferenceTarget(null);setWorkspace(key=>key+1)
   })
@@ -449,7 +453,7 @@ function Studio({ mode, active }) {
       if(point.x<rect.left || point.x>rect.right || point.y<rect.top || point.y>rect.bottom || readOnly || count>=maxNodes) return false
       add(kind,point);return true
     }} properties={model.nodeProperties[mode]} kinds={kinds} count={count} maxNodes={maxNodes} onAdd={add} onClose={()=>setNodeDialog(false)} />}
-    {referenceDialog && <FileDialog mode={mode} library={library} referenceOnly currentIdentity={fileIdentity} readOnly={readOnly} onChoose={insertReference} onReference={insertReference} onClose={()=>{pickerOrigin.current=null;setReferenceDialog(false)}} actions={!foldedGroups.some(group=>group.id===referenceTarget) && <button onClick={()=>transact(()=>{chooseCopycat(referenceTarget,true);setReferenceDialog(false)})}>Grundform wählen …</button>} />}
+    {referenceDialog && <FileDialog mode={mode} library={library} referenceOnly referenceTargetId={referenceTarget} currentIdentity={fileIdentity} readOnly={readOnly} onChoose={insertReference} onReference={insertReference} onClose={()=>{pickerOrigin.current=null;setReferenceDialog(false)}} actions={!foldedGroups.some(group=>group.id===referenceTarget) && <button onClick={()=>transact(()=>{chooseCopycat(referenceTarget,true);setReferenceDialog(false)})}>Grundform wählen …</button>} />}
     {fileDialog && <FileDialog mode={mode} library={library} currentIdentity={fileIdentity} readOnly={readOnly} onChoose={openEntry} onReference={insertReference} onClose={() => setFileDialog(false)} actions={<>    <div className="toolbar">
       <label className="example-select"><span>BEISPIELE</span><IconSelect domain="examples" aria-label="Beispiel öffnen" value="" onChange={e => transact(() => open(examples[mode][Number(e.target.value)][1]))}>
         <option value="" disabled iconMeta={{placeholder:true}}>Beispiel öffnen</option>
@@ -530,11 +534,13 @@ function Studio({ mode, active }) {
         </div>
       </section>
       <SplitHandle axis="x" value={graphShare} onChange={setGraphShare} label="Breite von Graph und Seitenleiste" />
-      <SidePanels showArrangement={Boolean(arrangementNode)} collapsed={{preview:previewCollapsed,arrangement:arrangementCollapsed,inspector:inspectorCollapsed}}>
+      <DormerProvider node={dormerNode} document={document} library={library} readOnly={readOnly} edit={patch=>transact(()=>commit(editNode(mode,document,{...document.graph.nodes.find(n=>n.id===dormerNode?.id),...patch})))}>
+      <SidePanels showArrangement={Boolean(arrangementNode || dormerNode)} collapsed={{preview:previewCollapsed,arrangement:arrangementCollapsed,inspector:inspectorCollapsed}}>
         {active && mode==='building' && areaPreviewNode ? <AreaPreview node={areaPreviewNode} document={document} readOnly={readOnly} edit={patch=>transact(()=>commit(editNode(mode,document,{...document.graph.nodes.find(node=>node.id===areaPreviewNode.id),...patch})))} previewMode={previewMode} onMode={setPreviewMode} collapsed={previewCollapsed} onToggle={()=>setPreviewCollapsed(value=>!value)}/> : active && <Suspense fallback={<section className="preview-panel"><div className="preview-meta">3D-Vorschau wird geladen …</div></section>}>
           <Preview onDiagnostics={setDiagnostics} mode={mode} document={previewDocument} library={library} selected={previewSelected} materials={materials}
             previewMode={previewMode} onMode={setPreviewMode} collapsed={previewCollapsed} onToggle={() => setPreviewCollapsed(value => !value)} />
         </Suspense>}
+        {dormerNode && <DormerPlacementPanel collapsed={arrangementCollapsed} onToggle={()=>setArrangementCollapsed(value=>!value)}/>}
         {arrangementNode && <ArrangementPanel key={arrangementNode.id} node={arrangementNode} document={document} library={library} readOnly={readOnly} edit={patch=>transact(()=>commit(editNode(mode,document,{...arrangementNode,...patch})))} onPreview={onArrangementPreview} collapsed={arrangementCollapsed} onToggle={()=>setArrangementCollapsed(value=>!value)}/>}
         <section className={`inspector${inspectorCollapsed ? ' is-collapsed' : ''}`} aria-label="Knoteninspektor">
           <div className="panel-heading"><span>Inspektor</span><div className="button-row"><small>{current ? 'AUSWAHL' : 'ERGEBNIS'}</small>
@@ -564,6 +570,8 @@ function Studio({ mode, active }) {
                 onChange={source => setWire(visibleNode.node.id, port.id, source)} />)}
             </details>}
             {model.operators?.[visibleNode.node.kind==='RESULT'?visibleNode.node.producerKind:visibleNode.node.kind] && <OperatorFields node={visibleNode.node.kind==='RESULT'?{...visibleNode.node,kind:visibleNode.node.producerKind}:visibleNode.node} edit={patchNode} roles={Object.keys(document.palette || {})}/>}
+            {visibleNode.node.referenceKey && <Field label="Referenzversion" value={String(visibleNode.node.libraryReference?.version || 1)} options={referenceVersions(visibleNode.node,document,library,savedData).map(entry=>[String(entry.version || 1),`v${entry.version || 1} · ${entry.name}`])} iconDomain="version" onChange={version=>{const entry=referenceVersions(visibleNode.node,document,library,savedData).find(entry=>String(entry.version || 1)===version);if(entry)insertReference(entry,visibleNode.node.id)}}/>}
+            {(visibleNode.node.kind==='GRAPH_REFERENCE' || visibleNode.node.producerKind==='GRAPH_REFERENCE' || visibleNode.node.libraryReference) && <button type="button" onClick={()=>{setReferenceTarget(visibleNode.node.id);setReferenceDialog(true)}}>Referenzversion ändern …</button>}
             <NodeFields {...{ mode, node: visibleNode.node, document, edit: patchNode, library }}
               onInspectNode={id => { setSelected(id); setSelectedIds([id]); setSelectedWire(null) }}
               onChooseCopycat={() => chooseCopycat(visibleNode.node.id)}
@@ -577,6 +585,7 @@ function Studio({ mode, active }) {
           </div>
         </section>
       </SidePanels>
+      </DormerProvider>
     </div>
     {copycatPicker && <SelectionBoundary onClose={()=>{pickerOrigin.current=null;setCopycatPicker(null)}}>
       <CopycatPicker {...copycatPicker} mode={mode} savedForms={savedForms} library={library}

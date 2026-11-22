@@ -22,7 +22,7 @@ test('configured picker drafts expose the exact roof and transformation sockets 
  assert.equal(roof.node.roofInputMode,'TEMPLATE');assert.deepEqual(roof.ports.map(p=>p.id),['geometry','roofTemplate'])
  const draft=configureNode(roof.node,'roofInputMode','SEGMENTS')
  const direct=nodePreview('building','ROOF',draft)
- assert.equal(direct.ports.length,9)
+ assert.equal(direct.ports.length,14)
  const t=nodePreview('building','TRANSFORMATION',configureNode(nodePreview('building','TRANSFORMATION').node,'transformationOrder','PRS'))
  assert.deepEqual(t.ports.map(p=>p.id),['positionValue','rotation','mirroring'])
  assert.equal(nodeControls('building',t.node).find(c=>c.path==='transformationOrder').value,'PRS')

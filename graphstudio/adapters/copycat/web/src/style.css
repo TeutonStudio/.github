@@ -547,6 +547,8 @@ button.danger:hover:not(:disabled),.file-list button.delete-armed {color:#fff;ba
 .node-catalog-select .node-preview {margin:0 auto}
 .node-operation {padding:7px}
 .node-operation select {width:100%;font:inherit}
+.node-input-name {display:grid;grid-template-columns:minmax(0,1fr);gap:4px;min-width:0;font-size:12px}
+.node-input-name input {width:100%;min-width:0;max-width:100%}
 .node-catalog-select:focus-visible {outline:2px solid #91dad4;outline-offset:3px}
 .node-catalog-card > p {line-height:1.5;margin:12px 0;font-size:12px}
 .node-catalog-card > small {display:block;color:var(--muted);font-size:11px;line-height:1.5}
@@ -654,3 +656,7 @@ svg.icon-select-check {width:14px;height:14px}
 .node-parameters {border-top:1px solid var(--line);padding:6px 8px;font-size:11px}
 .node-parameters summary {cursor:pointer}
 .node-parameters .hint {font-size:10px;white-space:normal;margin:5px 0}
+.dormer-panel .area-preview-body { min-height: 0; overflow: auto; }
+.dormer-grid { min-height: 120px; touch-action: none; }
+.dormer-inspector fieldset { min-width: 0; }
+.dormer-inspector .coordinate-grid input { width: 100%; min-width: 0; }

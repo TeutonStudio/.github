@@ -144,8 +144,8 @@ Vorschau: `http://127.0.0.1:4318/`. Sie bindet nur an Loopback.
 
 Transformationen benötigen Formgraphschema 4 bzw. Gebäudegraphschema 5; Vektorrechnung und der aneinanderliegende Säulenmodus benötigen Schema 5 bzw. 6.
 `sources.lock.json` pinnt den veröffentlichten Fachkerncommit
-[`509e441`](https://github.com/TeutonStudio/Copycat-Architecture/commit/509e441a19f1645f3b1225ad7ff4948d4a1edb4e)
-auf Basis 0.6.5, Branch `codex/graphstudio-pages-core`. Der neuere Mod-Hauptzweig
+[`7e1771d`](https://github.com/TeutonStudio/Copycat-Architecture/commit/7e1771de7545b31130a2a751ba2759beaf6d4bdb)
+auf Basis 0.6.5, Branch `codex/roof-dormers`. Der neuere Mod-Hauptzweig
 und vorhandene Release-JARs werden dadurch nicht ersetzt. Der öffentliche Build
 prüft weiterhin saubere, gepinnte Quellen und den Mindestvertrag in
 `adapters/copycat/core-contract.json`.
@@ -266,3 +266,11 @@ Neue Graphkarten erzeugen ihren Copycat unmittelbar am Ergebnis. Ausgabetyp, Erz
 Gruppeneingänge definieren die öffentliche Schnittstelle eines Graphen. Ihre stabilen Knotenkennungen identifizieren die Argumentanschlüsse; Name, Datentyp, Standardquelle und gespeicherte Reihenfolge können bearbeitet werden. Eine gespeicherte Referenz bindet eine genaue Version samt Bibliotheksabhängigkeiten ein. Dies gilt auch für Dachvorlagen und verschachtelte Referenzen.
 
 Gebäudegraphschema 14 ergänzt diese Funktionen. Formgraphschema 9 und bisherige Gebäudegraphen bleiben lesbar. Die Auswahlfelder verwenden die gemeinsam übernommenen SVG-Icons.
+
+### Dachvorlagen und Gauben (Graphschema 17)
+
+Dachvorlagen bieten die ergänzten Bauteilanschlüsse und eine optionale Vorschaufläche. Die Dachkontur kann zwischen Gesamtfläche und tatsächlichem Grundriss gewählt werden. Der Inspektor wechselt gespeicherte Referenzversionen am vorhandenen Knoten.
+
+Sattelgauben lassen sich an modernen Dächern und direkt erzeugenden Ergebnissen anschließen, im 2D-Grundriss platzieren und bearbeiten. Die Engine prüft die vollständige sichtbare Dachschräge einschließlich Kehlen, Löchern, Anschluss und Überschneidungen. Ungültige Entwürfe werden begründet; Platzieren, Verschieben und Inspektoränderungen unterstützen Undo/Redo. Die Positionen gehören zum verwendenden Dach und bleiben bei einem Vorlagenwechsel erhalten.
+
+[Bedienung und Prüfnachweis](reports/roof-dormers-2026-11-22.md) · [Beispielgraph mit eingefrorener Testdach-Vorlage](adapters/copycat/web/public/examples/testdach-dormer-building.json).
