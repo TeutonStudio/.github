@@ -91,3 +91,17 @@ test('family switches keep shared group instances valid with independent externa
   }
  }
 })
+
+
+test('switching a number constant to arithmetic clears its constant-only value', () => {
+  for (const kind of ['INT','COUNT']) {
+    const source=doc(true,[n(true,kind,'op',{countValue:7})])
+    source.graph.schema=13
+    source.graph.nodes.find(n=>n.id==='result').resultType='INT'
+    const result=switchOperator('building',source,'op','INT_ADD')
+    const changed=result.graph.nodes.find(n=>n.id==='op')
+    assert.equal(changed.kind,'INT_ADD')
+    assert.equal(changed.countValue,null)
+    inspect('building',result)
+  }
+})

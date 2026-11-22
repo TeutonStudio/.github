@@ -105,3 +105,42 @@ Testfixture. Die Zeitmessung kann gegen den separat gestarteten Produktionsbuild
 laufen. `--profile` ergänzt CPU-Profile; `--cpu-rate 4` erlaubt einen zusätzlichen
 Drosselungstest. Playwright für Python wird wie bei den vorhandenen Browserskripten
 benötigt. Die Browserkontexte und deren Speicher sind vollständig isoliert.
+
+
+## Integration in den öffentlichen 0.6.5-Stand
+
+Die Veröffentlichung basiert auf `0a989973fefb197203fe3f7b1bc040aaecd70d32`
+im Organisationsrepo. Der öffentliche Fachkern bleibt unverändert bei
+`8cd97f23b702718fd1c8494bdde6cf52b190ebbd` (0.6.5). Resultatknoten,
+Graphparameter, Operationswechsel und direkte Knotenfelder dieses neueren
+Stands bleiben erhalten. Die obige Vorher-/Nachher-Messreihe dokumentiert die
+ursprüngliche 0.6.4-Abnahme und wird nicht als neue 0.6.5-Messung ausgegeben.
+
+Die vollständige lokale 0.6.5-Adapterprüfung bestand mit **339 Tests**, ergänzt
+um die gezielte Zahlenwechsel-Regression; die fünf Operatorfamilien-Tests und
+die drei Buildvertragsprüfungen bestehen. Der Produktionsbuild ist erfolgreich.
+Der neue Browserlauf besteht für Canvas-Isolation, verworfene Bewegungen,
+Mehrfachauswahl, eingeklappte Gruppen, Undo/Redo, Speicherung, Wiederladen,
+Ansicht gespeicherter Versionen sowie Werte und Operationsauswahl direkt am Knoten.
+Die Mehrfachauswahl verwendet explizite Testquellen, weil frische 0.6.5-Karten
+keine zwei bearbeitbaren Quellen mitbringen. Der Profiler setzt beim neueren
+Resultatknoten ausdrücklich `resultMode: VALUE` und `resultSource`.
+
+Beim Bediennachtest wurde zusätzlich ein bereits bestehender Fehler beim
+Wechsel einer Zahlenkonstante in eine Rechenoperation gefunden: Der alte
+`countValue` wurde in den Rechenknoten kopiert und anschließend vom nativen
+Validator abgewiesen. Das Feld wird jetzt nur für `INT`-/`COUNT`-Konstanten
+übernommen. Der neue Test prüft beide Ausgangsarten; der Browserlauf prüft
+den tatsächlichen Wechsel zu Addition und die Rückgängig-Aktion.
+
+Das ältere Dropdown-Gesamtskript läuft in seiner Galeriephase, scheitert im
+0.6.5-Editor jedoch an der veralteten Klasse `.catalog-card` (aktuell
+`.node-catalog-card`). Es wird für diesen Stand nicht als bestanden gezählt.
+Die neue direkte Browserprüfung deckt Werteingabe, Operationsauswahl und
+Rückgängig/Wiederholen mit den aktuellen Bedienelementen ab.
+
+Der vollständige frische Build mit nativen Tests und JVM→Browser→JVM-Rückimport
+läuft vor dem Merge im bestehenden GitHub-Actions-Workflow. Veröffentlichung
+und Pages-Deployment werden über [PR #10](https://github.com/TeutonStudio/.github/pull/10)
+geprüft. Es werden keine lokalen Alpha-Ausgaben oder ungeprüften Fachkernpins
+in die öffentliche Ausgabe übernommen.

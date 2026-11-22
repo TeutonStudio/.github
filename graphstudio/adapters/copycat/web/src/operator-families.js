@@ -26,7 +26,7 @@ export function switchOperator(mode,document,id,kind) {
   if(family.id==='positions' && kind==='POSITION_X')return splitPosition(mode,document,id)
   const building=mode==='building',old=document.graph.nodes.find(node=>node.id===id)
   let next=newNode(building,kind,id,old.x,old.y,true)
-  for(const key of ['name','materialMode','materialGroup','previewGroup','role','preview','rotationAxis','quarterTurns','rotationPivot','copycatTransforms','countValue']) if(key in old) next[key]=structuredClone(old[key])
+  for(const key of ['name','materialMode','materialGroup','previewGroup','role','preview','rotationAxis','quarterTurns','rotationPivot','copycatTransforms','countValue']) if(key in old && (key!=='countValue' || ['INT','COUNT'].includes(kind))) next[key]=structuredClone(old[key])
   if(kind.endsWith('MIRROR') || kind==='MIRROR') next.mirror=old.mirror
   if(kind.endsWith('POSITION') || kind==='TRANSLATE') next.translation=old.translation
   const limits=building?model.buildingInputs[kind]:model.form.find(n=>n.kind===kind)

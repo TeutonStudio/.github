@@ -15,7 +15,7 @@ import { starterCard,newNode } from './src/generated/engine.mjs';
 const fixtures={};
 for(const count of [12,48,96]) {
  const doc=starterCard(),result=doc.graph.nodes.find(n=>n.resultType);
- doc.graph.nodes=[doc.graph.nodes[0],...Array.from({length:count-2},(_,i)=>({...newNode(true,i%3===2?'INT_ADD':'INT',`bench_${i}`,i%8*235,Math.floor(i/8)*130),...(i%3===2?{inputs:[`bench_${i-2}`,`bench_${i-1}`]}:{countValue:1})})),{...result,x:8*235,y:130,resultType:'INT',inputs:['bench_2']}];
+ doc.graph.nodes=[doc.graph.nodes[0],...Array.from({length:count-2},(_,i)=>({...newNode(true,i%3===2?'INT_ADD':'INT',`bench_${i}`,i%8*235,Math.floor(i/8)*130),...(i%3===2?{inputs:[`bench_${i-2}`,`bench_${i-1}`]}:{countValue:1})})),{...result,x:8*235,y:130,resultType:'INT',resultMode:'VALUE',resultSource:'bench_2',inputs:['bench_2']}];
  doc.name='Drag Benchmark';fixtures[count]={schema:1,drafts:{building:{mode:'building',document:doc,materials:{}}},graphs:[],nodeGroups:[],mods:[],documentNames:{}};
 }
 console.log(JSON.stringify(fixtures));
