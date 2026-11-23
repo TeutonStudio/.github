@@ -144,7 +144,7 @@ Vorschau: `http://127.0.0.1:4318/`. Sie bindet nur an Loopback.
 
 Transformationen benötigen Formgraphschema 4 bzw. Gebäudegraphschema 5; Vektorrechnung und der aneinanderliegende Säulenmodus benötigen Schema 5 bzw. 6.
 `sources.lock.json` pinnt den veröffentlichten Fachkerncommit
-[`7e1771d`](https://github.com/TeutonStudio/Copycat-Architecture/commit/7e1771de7545b31130a2a751ba2759beaf6d4bdb)
+[`67c1852`](https://github.com/TeutonStudio/Copycat-Architecture/commit/67c1852a969595221340ace78bbb37f8ed23c1fe)
 auf Basis 0.6.5, Branch `codex/roof-dormers`. Der neuere Mod-Hauptzweig
 und vorhandene Release-JARs werden dadurch nicht ersetzt. Der öffentliche Build
 prüft weiterhin saubere, gepinnte Quellen und den Mindestvertrag in
@@ -274,3 +274,21 @@ Dachvorlagen bieten die ergänzten Bauteilanschlüsse und eine optionale Vorscha
 Sattelgauben lassen sich an modernen Dächern und direkt erzeugenden Ergebnissen anschließen, im 2D-Grundriss platzieren und bearbeiten. Die Engine prüft die vollständige sichtbare Dachschräge einschließlich Kehlen, Löchern, Anschluss und Überschneidungen. Ungültige Entwürfe werden begründet; Platzieren, Verschieben und Inspektoränderungen unterstützen Undo/Redo. Die Positionen gehören zum verwendenden Dach und bleiben bei einem Vorlagenwechsel erhalten.
 
 [Bedienung und Prüfnachweis](reports/roof-dormers-2026-11-22.md) · [Beispielgraph mit eingefrorener Testdach-Vorlage](adapters/copycat/web/public/examples/testdach-dormer-building.json).
+
+### Dach- und Fassadenkanten (Graphschema 18)
+
+Dächer mit Vorlage oder Segmenten bieten im Inspektor für jede gerade Außen-
+und Innenkante die Wahl **Dach/Fassade** mit eigenen Icons. Fassaden erzeugen
+einen typisierten Segmenteingang; ihre maximale Höhe stammt aus der vollständig
+ausgewerteten festen Segmenthöhe. Das Segment wiederholt sich entlang der
+Kante, nicht nach oben. Niedrige Fassaden ergeben einen Giebel mit oberem
+Walmabschluss, höhere ermöglichen einen vollständigen Giebel. Die Regeln
+gehören dem verwendenden Dach; gespeicherte Dachvorlagen bleiben unverändert.
+
+Die nummerierte Kantenkarte, Quellenwahl, dynamischen Anschlüsse und
+Undo/Redo verwenden stabile geometrische Kennungen. Ohne individuelle Regeln
+bleibt die bisherige Dachform erhalten.
+
+[Bedienung und Prüfnachweis](reports/roof-edges-2026-11-23.md) ·
+[Beispiel mit 2 B Fassade](adapters/copycat/web/public/examples/roof-edges-facade-2b-building.json) ·
+[Beispiel mit 6 B Fassade](adapters/copycat/web/public/examples/roof-edges-facade-6b-building.json).

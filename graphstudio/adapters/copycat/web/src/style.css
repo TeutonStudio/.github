@@ -660,3 +660,5 @@ svg.icon-select-check {width:14px;height:14px}
 .dormer-grid { min-height: 120px; touch-action: none; }
 .dormer-inspector fieldset { min-width: 0; }
 .dormer-inspector .coordinate-grid input { width: 100%; min-width: 0; }
+
+.roof-edge-map{display:block;width:100%;height:220px;background:var(--panel-background,#15212b);border:1px solid var(--border,#526370);margin:8px 0}.roof-edge-cell{fill:#416b6f;stroke:#243e43;stroke-width:.025}.roof-edge-line{cursor:pointer;stroke:#e5a442}.roof-edge-line.facade{stroke:#72b8f5}.roof-edge-line circle{fill:#263a46;stroke-width:.04}.roof-edge-line text{fill:#fff;stroke:none;pointer-events:none}.roof-edge-line.selected line,.roof-edge-line:focus line{stroke:#ffeb6c}.roof-edge-list{max-height:440px;overflow:auto}.roof-edge-list fieldset{min-width:0;margin:8px 0;border:1px solid #526370}.roof-edge-list fieldset.selected{border-color:#ffdf5b}.roof-edge-list label{min-width:0}.roof-edge-list output{font-weight:700}

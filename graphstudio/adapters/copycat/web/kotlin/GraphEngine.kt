@@ -650,3 +650,18 @@ fun checkRoofDormerPlacement(handle:Int,area:String,instance:dynamic):Json {
 }
 @JsExport
 fun releaseRoofDormerModel(handle:Int) { dormerWorkspaces.remove(handle) }
+
+
+@JsExport
+fun roofEdgeModel(document:dynamic,library:dynamic,id:String):Json {
+    val b=building(document);val g=requireNotNull(b.graph)
+    val evaluation=BuildingGraphCompiler.Evaluation(g,b.palette,map(library.forms) { obj,key->form(obj[key]) },map(library.modules) { obj,key->module(obj[key]) })
+    val model=evaluation.roofEdgeModel(id)
+    val resolved=evaluation.node(id)
+    val source=if(resolved.roofInputMode==RoofInputMode.TEMPLATE) resolved.roofTemplate?.takeIf(String::isNotEmpty)?.let { evaluation.node(it) } else resolved
+    val shared=source?.inputs?.getOrNull(RoofTemplates.index("wall")).orEmpty().ifEmpty { resolved.roofConfig?.wall.orEmpty() }
+    val defaultSource=shared.takeIf { ref->g.nodes.any { it.id==ref } && GraphTypes.building(evaluation.graph,ref)=="WALL" }.orEmpty()
+    return json("points" to model.points.map { it.jsPoint() }.toTypedArray(),"defaultSource" to defaultSource,
+        "definitions" to g.nodes.filter { it.id!=id && runCatching { GraphTypes.building(g,it.id)=="WALL" }.getOrDefault(false) }.map { json("id" to it.id,"name" to it.name.ifBlank { it.id }) }.toTypedArray(),
+        "edges" to model.edges.map { e->json("id" to e.id,"direction" to e.direction,"start" to e.start.jsPoint(),"end" to e.end.jsPoint(),"length" to e.length,"mode" to e.mode.name,"height" to e.height,"message" to e.message) }.toTypedArray())
+}

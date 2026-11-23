@@ -1,3 +1,4 @@
+import {retainsRoofEdgeSource} from './roof-edge-settings.js'
 import {DormerProvider,DormerPlacementPanel} from './Dormers.jsx'
 import {dormerHost} from './dormer-placement.js'
 import {referenceVersions} from './reference-versions.js'
@@ -194,7 +195,7 @@ function Studio({ mode, active }) {
   const commit = next => {
     if (readOnly) throw new Error('Gespeicherte Version: nur Betrachten. Zum Bearbeiten Ungespeichert wählen.')
     const nextEntries=inspect(mode,next),nextWires=connections(nextEntries)
-    const removed=wires.filter(wire=>!nextWires.some(w=>w.source===wire.source&&w.target===wire.target&&w.port===wire.port)&&nextEntries.some(e=>e.node.id===wire.source))
+    const removed=wires.filter(wire=>!retainsRoofEdgeSource(next,wire)&&!nextWires.some(w=>w.source===wire.source&&w.target===wire.target&&w.port===wire.port)&&nextEntries.some(e=>e.node.id===wire.source))
     if(removed.length)setMessage({text:`${removed.length} inkompatible Verbindung${removed.length===1?' wurde':'en wurden'} wegen des Typwechsels getrennt. Rückgängig stellt sie wieder her.`})
     if(next.name !== document.name && draftIdentity) updateWorkspace(data=>renameDocument(data,draftIdentity,next.name))
     if (JSON.stringify(next) !== JSON.stringify(document)) {

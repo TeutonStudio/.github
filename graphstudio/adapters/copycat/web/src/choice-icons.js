@@ -136,6 +136,7 @@ export const fixedChoices = {
   RoomMode:{FOOTPRINT:'room',SEGMENTS:'segmentLayout'},
   RoofForm:{FLAT:'flatRoof',PENT:'pent',GABLE:'roof',HIP:'hip',MANSARD:'mansard',CROSS:'crossRoof'},
   dormerDirection:{auto:'auto',0:'north',1:'east',2:'south',3:'west'},
+  RoofEdgeMode:{ROOF:'roof',FACADE:'segment'},
   RoofContourMode:{'':'inherit',BOUNDS:'rectangle',CONTOUR:'roomGeometry'},
   RoofMode:{HEIGHT:'height',ANGLE:'slope'}, StairLayout:{STRAIGHT:'straight',L:'stairL',U:'stairU'},
   WallPolicy:{AUTO:'auto',EXPLICIT:'explicit',OPEN:'open'},

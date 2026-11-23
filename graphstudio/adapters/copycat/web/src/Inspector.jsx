@@ -21,6 +21,7 @@ export function portName(port, node) {
   if(node.kind==='RESULT' && node.resultMode!=='VALUE')node={...node,kind:node.producerKind,resultType:null}
   if(node.kind==='CONDITIONAL')return ['Wert A · wahr','Boolean','Wert B · falsch'][Number(port.id.replace('in:',''))]
   if(node.kind==='BOOLEAN_LOGIC')return `Boolean ${Number(port.id.replace('in:',''))+1}`
+  if(port.id.startsWith('semantic:roofEdge:')) { const key=port.id.slice('semantic:roofEdge:'.length).replace(/:source$/,'');const [q,x,z]=key.split(':');return `Fassade · ${['Nord','Ost','Süd','West'][Number(q)]} · X ${x}/Z ${z}` }
   if(port.id==='roofTemplate')return 'Dachvorlage'
   if(port.id==='geometry' && node.kind==='ROOF')return 'Fläche'
   if(port.id==='geometry' && node.kind==='ROOF_TEMPLATE')return 'Vorschaufläche (optional)'

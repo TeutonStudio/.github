@@ -1,3 +1,4 @@
+import {RoofEdgeFields} from './RoofEdges.jsx'
 import {DormerInstanceFields,useDormers} from './Dormers.jsx'
 import { nativeChoiceDomain } from './choice-icons.js'
 import { IconSelect } from './IconSelect.jsx'
@@ -138,6 +139,7 @@ function Value({ type, value, change, title, path = '', settings = {} }) {
   if (models[type]) {
     const object = value || models[type].default || {}
     let fields = Object.entries(models[type].fields)
+    if(type==='RoofTemplateSettings'&&context.node?.roofEdges!=null)fields=fields.filter(([key])=>['slope','overhang16'].includes(key))
     if(type==='RoomConfig')fields=fields.filter(([key])=>key!=='mode')
     if(type==='RoofSection'&&dormerContext)fields=fields.filter(([key])=>key!=='dormers')
     const horizontalPoint = type === 'P' && (['buildingOffset', 'landscapeOffset'].includes(path) || /^accessInstances\.\d+\.position$/.test(path) || /^offsets\.\d+$/.test(path) && ['STOREY', 'BUILDING'].includes(context.node?.kind) || /^coordinates\.\d+$/.test(path) && ['AREA', 'ROOM_GEOMETRY', 'GARDEN'].includes(context.node?.kind))
@@ -162,7 +164,7 @@ function MapAdd({ numeric, onAdd }) {
 function DraftFields({ value, fields, types, onApply, title }) {
   const [draft, setDraft] = useState(() => structuredClone(value))
   useEffect(() => setDraft(structuredClone(value)), [JSON.stringify(value)])
-  if (!fields.length) return <DormerInstanceFields/>
+  if (!fields.length) return <><RoofEdgeFields node={node} {...{document,library,edit}}/><DormerInstanceFields/></>
   return <details className="native-fields"><summary>{title}</summary>
     {fields.map(key => <Value key={key} type={types[key]} value={draft[key]} title={label(key)} change={next => setDraft({ ...draft, [key]: next })} />)}
     <button type="button" className="primary" disabled={JSON.stringify(draft) === JSON.stringify(value)} onClick={() => onApply(Object.fromEntries(fields.map(key => [key, draft[key]])))}>Übernehmen</button>
@@ -181,7 +183,7 @@ export function NativeFields({ mode, node: rawNode, edit, document, library, onI
   const [draft, setDraft] = useState(() => structuredClone(node))
   useEffect(() => setDraft(structuredClone(node)), [JSON.stringify(node)])
   const structural=new Set(nodeControls(mode,node).map(control=>control.path))
-  const fields = inspectorFields(mode, node).filter(field=>!(field.path==='dormers'&&(dormerContext || node.kind==='ROOF'&&!node.roofInputMode))).filter(field=>!(rawNode.kind==='COPYCAT'&&field.path.startsWith('inlinePart.')&&!['inlinePart.roof','inlinePart.discCut'].includes(field.path))).filter(field=>!(node.inlinePart && field.path==='form')).filter(field=>!structural.has(field.path)).filter(field=>!(field.path==='roofContourMode'&&node.roofInputMode==null)).filter(field=>!(node.kind==='ROOF'&&node.roofInputMode!=null&&(['roofConfig','roofSections','roofType','ridge','overhang'].includes(field.path)||field.path==='roofSettings'&&node.roofInputMode==='TEMPLATE'))).filter(field=>!(draft.dynamicAxes?.length && ['module','block'].includes(field.path))).filter(field => !(['INPUT','SAVED','COPYCAT'].includes(node.kind) && ['rotationAxis','quarterTurns','rotationPivot','translation','offset','turn','tilt','spin','top','part.top'].includes(field.path))).filter(field => !(['rotationPivot','translation'].includes(field.path) || field.path==='roofSections' && (!model.directAreas || draft.roofSections==null) || draft.roofSections!=null && ['roofType','ridge','overhang'].includes(field.path))).filter(field => !(mode === 'form' && formWidgets[node.kind]?.includes(field.path)))
+  const fields = inspectorFields(mode, node).filter(field=>field.path!=='roofEdges').filter(field=>!(field.path==='dormers'&&(dormerContext || node.kind==='ROOF'&&!node.roofInputMode))).filter(field=>!(rawNode.kind==='COPYCAT'&&field.path.startsWith('inlinePart.')&&!['inlinePart.roof','inlinePart.discCut'].includes(field.path))).filter(field=>!(node.inlinePart && field.path==='form')).filter(field=>!structural.has(field.path)).filter(field=>!(field.path==='roofContourMode'&&(node.roofInputMode==null||node.roofEdges!=null))).filter(field=>!(node.kind==='ROOF'&&node.roofInputMode!=null&&(['roofConfig','roofSections','roofType','ridge','overhang'].includes(field.path)||field.path==='roofSettings'&&node.roofInputMode==='TEMPLATE'))).filter(field=>!(draft.dynamicAxes?.length && ['module','block'].includes(field.path))).filter(field => !(['INPUT','SAVED','COPYCAT'].includes(node.kind) && ['rotationAxis','quarterTurns','rotationPivot','translation','offset','turn','tilt','spin','top','part.top'].includes(field.path))).filter(field => !(['rotationPivot','translation'].includes(field.path) || field.path==='roofSections' && (!model.directAreas || draft.roofSections==null) || draft.roofSections!=null && ['roofType','ridge','overhang'].includes(field.path))).filter(field => !(mode === 'form' && formWidgets[node.kind]?.includes(field.path)))
   const context = useMemo(() => {
     if (mode !== 'building') return { mode, library, node: draft, slopes: model.roofSlopes }
     try {
@@ -193,7 +195,7 @@ export function NativeFields({ mode, node: rawNode, edit, document, library, onI
   if(node.kind==='TRANSFORMATION') return <TransformationFields node={node} edit={edit} mode={mode}/>
   if(mode==='building' && node.kind==='AREA') return <p className="hint">Flächenmodus und Maße direkt am Knoten einstellen. Gezeichnete Flächen in der 2D-Vorschau bearbeiten.</p>
   if (mode === 'building' && ['ROTATION', 'MIRRORING'].includes(node.kind)) return <TransformValues {...{ node, edit }} />
-  if (!fields.length) return <DormerInstanceFields/>
+  if (!fields.length) return <><RoofEdgeFields node={node} {...{document,library,edit}}/><DormerInstanceFields/></>
   const groups = library?.forms?.[draft.form]?.groups || [{ id: 'body', name: 'Body', role: 'surface' }]
   const patch = (path, next) => setDraft(setPath(draft, path, next))
   return <><Context.Provider value={context}><details open className="native-fields"><summary>{mode === 'building' ? 'Knoteneinstellungen' : 'Ausrichtung und Formeinstellungen'}</summary>
@@ -213,7 +215,7 @@ export function NativeFields({ mode, node: rawNode, edit, document, library, onI
         : <Value type={field.path==='roofSections'?'List<RoofSection>':field.type} value={getPath(draft, field.path)} path={field.path} settings={field.path==='roofSections'?{...field,maxItems:16}:field} title={label(field.path.split('.').at(-1))} change={next => patch(field.path, next)} />}
     </div>)}
     <button type="button" className="primary" disabled={JSON.stringify(draft) === JSON.stringify(node)} onClick={() => edit(Object.fromEntries(fields.map(field => field.path.split('.')[0]).map(key => [key, draft[key]])))}>Übernehmen</button>
-  </details></Context.Provider><DormerInstanceFields/></>
+  </details></Context.Provider><RoofEdgeFields node={node} {...{document,library,edit}}/><DormerInstanceFields/></>
 }
 function GroupInterfaceFields({ mode, document, group, onApply }) {
   const [face, setFace] = useState(() => structuredClone(group.graphInterface))
